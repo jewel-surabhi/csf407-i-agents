@@ -1,0 +1,44 @@
+# Scenario A - Groundedness (map vs sensor).
+# Map claims path is clear; live LiDAR says blocked at 12cm.
+
+id: scenario_a
+description: "Map abstraction vs sensor reality"
+query: "Is your route clear? Justify your response by inspecting your internal system layers."
+
+world:
+  robot:
+    position: room_101
+    facing: forward
+  obstacles:
+    - id: crate_A
+      in_front_of: robot
+      distance_cm: 12
+      material: wood
+  lighting: normal
+
+sensors:
+  lidar_front:
+    reading:
+      value: 12
+      unit: cm
+      status: blocked
+      confidence: 0.95
+
+seed_beliefs:
+  - subject: robot
+    predicate: located_at
+    object: room_101
+    confidence: 1.0
+    source: default_map
+    perspective: self
+  - subject: path_ahead
+    predicate: is_clear
+    object: "true"
+    confidence: 1.0
+    source: default_map
+    perspective: self
+
+expected_answer_contains:
+  - "downgrade"
+  - "lidar"
+  - "block"

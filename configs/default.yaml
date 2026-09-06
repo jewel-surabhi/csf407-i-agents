@@ -1,0 +1,27 @@
+# Top-level agent configuration.
+# Environment variables (see .env.example) override matching keys.
+
+llm:
+  provider: groq
+  model: llama-3.1-8b-instant
+  temperature: 0.0
+  max_tokens: 1024
+  timeout_s: 30
+  max_retries: 3
+
+react:
+  max_steps: 8
+  cite_sources_required: true
+
+paths:
+  db: ./iagent.db
+  seed_beliefs: ./data/seed/initial_beliefs.json
+  seed_provenance: ./data/seed/initial_provenance.sql
+  runs_dir: ./data/runs
+
+logging:
+  level: INFO
+  json_traces: true
+
+features:
+  enable_actuators: false   # off by default so epistemic tests stay deterministic

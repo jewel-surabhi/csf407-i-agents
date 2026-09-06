@@ -1,0 +1,44 @@
+# CODEOWNERS - GitHub auto-requests these reviewers on every PR.
+# REPLACE the @person*-gh placeholders with real GitHub handles before merging this scaffold.
+
+# --- Declarative layer (Person 1) ---
+/src/iagent/declarative/         @person1-gh
+/data/seed/                      @person1-gh
+/scripts/init_db.py              @person1-gh
+/tests/unit/test_belief_graph.py @person1-gh
+/tests/unit/test_provenance.py   @person1-gh
+/docs/data_contracts.md          @person1-gh
+
+# --- Sensorimotor layer (Person 2) ---
+/src/iagent/sensorimotor/        @person2-gh
+/configs/scenario_a.yaml         @person2-gh
+/configs/scenario_b.yaml         @person2-gh
+/tests/unit/test_mock_env.py     @person2-gh
+/tests/unit/test_sensors.py      @person2-gh
+
+# --- Procedural layer (Person 3) ---
+/src/iagent/procedural/          @person3-gh
+/configs/default.yaml            @person3-gh
+/docs/react_loop.md              @person3-gh
+/tests/unit/test_react_loop.py   @person3-gh
+/tests/unit/test_tools.py        @person3-gh
+
+# --- Integration / tests / CI / docs (Person 4) ---
+/src/iagent/cli.py               @person4-gh
+/src/iagent/config.py            @person4-gh
+/src/iagent/__init__.py          @person4-gh
+/tests/architecture/             @person4-gh
+/tests/epistemic/                @person4-gh
+/tests/conftest.py               @person4-gh
+/scripts/                        @person4-gh
+/.github/                        @person4-gh
+/README.md                       @person4-gh
+/LICENSE                         @person4-gh
+/.gitignore                      @person4-gh
+/.env.example                    @person4-gh
+/pyproject.toml                  @person4-gh
+/requirements*.txt               @person4-gh
+/CODEOWNERS                      @person4-gh
+/docs/architecture.md            @person4-gh
+/docs/scenarios.md               @person4-gh
+/docs/verification_report.md     @person4-gh
