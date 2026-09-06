@@ -1,0 +1,12 @@
+{
+  "nodes": [
+    {"id": "robot",      "type": "agent",    "labels": ["self"]},
+    {"id": "room_101",   "type": "location", "labels": ["room"]},
+    {"id": "path_ahead", "type": "location", "labels": ["corridor"]},
+    {"id": "box_01",     "type": "object",   "labels": ["box", "container"]},
+    {"id": "red_atom",   "type": "fact",     "labels": ["color", "red"]},
+    {"id": "blue_atom",  "type": "fact",     "labels": ["color", "blue"]},
+    {"id": "brown_atom", "type": "fact",     "labels": ["color", "brown"]}
+  ],
+  "edges": []
+}

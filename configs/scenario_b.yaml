@@ -1,0 +1,50 @@
+# Scenario B - Perspective (user vs egocentric vs historical/third-party).
+# User expects RED, camera sees BROWN (yellow ambient), bot_02 logged BLUE.
+
+id: scenario_b
+description: "User vs egocentric vs historical perspective on box_01 color"
+query: >-
+  What color does the user think the object is, what color do you register it
+  as, and what does your data history say its true state is?
+
+world:
+  robot:
+    position: room_101
+    facing: forward
+  objects:
+    - id: box_01
+      true_color: blue          # ground truth for the sim; agent should not see this directly
+      in_view_of: camera_front
+  lighting: yellow
+
+sensors:
+  camera_front:
+    reading:
+      detections:
+        - item_id: box_01
+          class: box
+          color_perceived: brown
+          confidence: 0.82
+      ambient:
+        lighting: yellow
+        warning: "color perception unreliable"
+
+seed_beliefs:
+  - subject: box_01
+    predicate: has_color
+    object: red_atom
+    confidence: 0.9
+    source: user
+    perspective: user
+  - subject: box_01
+    predicate: has_color
+    object: blue_atom
+    confidence: 0.7
+    source: bot_02
+    perspective: "third_party:bot_02"
+
+expected_answer_contains:
+  - "red"
+  - "brown"
+  - "blue"
+  - "user"
