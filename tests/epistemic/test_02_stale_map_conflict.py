@@ -15,4 +15,4 @@ pytestmark = [
 
 
 def test_stale_map_conflict():
-    assert False
+    raise NotImplementedError("EMPTY PLACEHOLDER — implement in the phase named in the skip reason.")

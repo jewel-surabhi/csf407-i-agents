@@ -16,4 +16,4 @@ pytestmark = [
 
 
 def test_grounded_query():
-    assert False
+    raise NotImplementedError("EMPTY PLACEHOLDER — implement in the phase named in the skip reason.")
