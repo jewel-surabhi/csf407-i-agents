@@ -15,4 +15,4 @@ pytestmark = [
 
 
 def test_provenance_written():
-    assert False
+    raise NotImplementedError("EMPTY PLACEHOLDER — implement in the phase named in the skip reason.")

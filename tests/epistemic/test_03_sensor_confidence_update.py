@@ -16,4 +16,4 @@ pytestmark = [
 
 
 def test_sensor_confidence_update():
-    assert False
+    raise NotImplementedError("EMPTY PLACEHOLDER — implement in the phase named in the skip reason.")

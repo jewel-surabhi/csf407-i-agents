@@ -16,4 +16,4 @@ pytestmark = [
 
 
 def test_historical_perspective():
-    assert False
+    raise NotImplementedError("EMPTY PLACEHOLDER — implement in the phase named in the skip reason.")
