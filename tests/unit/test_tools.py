@@ -7,4 +7,4 @@ pytestmark = pytest.mark.skip(reason="EMPTY PLACEHOLDER — implement in Phase 4
 
 def test_placeholder():
     """See PROJECT_PLAN.md section G.4."""
-    assert False
+    raise NotImplementedError("EMPTY PLACEHOLDER — implement in the phase named in the skip reason.")

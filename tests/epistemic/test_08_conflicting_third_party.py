@@ -18,4 +18,4 @@ pytestmark = [
 
 
 def test_conflicting_third_party():
-    assert False
+    raise NotImplementedError("EMPTY PLACEHOLDER — implement in the phase named in the skip reason.")
