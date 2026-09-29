@@ -128,6 +128,24 @@ class ProvenanceStore:
         except sqlite3.Error as e:
             raise KnowledgeError(f"source insert failed: {e}") from e
 
+    def apply_seed_script(self, sql_path: str | Path) -> None:
+        """Execute a trusted seed SQL file against the store's connection.
+
+        Meant for one-shot bootstrap of the `sources` table from
+        `data/seed/initial_provenance.sql` and equivalent files. Do NOT use
+        this for user-supplied SQL — no parameterization.
+        """
+        path = Path(sql_path)
+        try:
+            script = path.read_text(encoding="utf-8")
+        except OSError as e:
+            raise KnowledgeError(f"cannot read seed script {sql_path}: {e}") from e
+        try:
+            with self._conn:
+                self._conn.executescript(script)
+        except sqlite3.Error as e:
+            raise KnowledgeError(f"seed script {sql_path} failed: {e}") from e
+
     # ---- reads ---------------------------------------------------------------
 
     def _get_by_id(self, provenance_id: int) -> ProvenanceEntry:
