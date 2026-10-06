@@ -1,13 +1,19 @@
 """SensorimotorAPI — the SOLE public entrypoint for the sensorimotor layer.
 
-Signatures frozen at end of Phase 1. Placeholder impls raise NotImplementedError.
+Signatures were frozen at end of Phase 1 (see PROJECT_PLAN.md section G.2).
 Owner: Person 2 (Phase 3).
+
+Only `sense_lidar` is implemented in this pass — Scenario A only needs the
+LiDAR. Camera, clock and actuators still raise `NotImplementedError` and land
+in later commits.
 """
 
 from __future__ import annotations
 
 from typing import Literal
 
+from iagent.sensorimotor import sensors
+from iagent.sensorimotor.mock_env import MockEnvironment
 from iagent.sensorimotor.models import ActionResult, SensorPayload
 
 __all__ = ["SensorimotorAPI", "SensorPayload", "ActionResult"]
@@ -16,9 +22,8 @@ __all__ = ["SensorimotorAPI", "SensorPayload", "ActionResult"]
 class SensorimotorAPI:
     """Facade wrapping a `MockEnvironment`."""
 
-    def __init__(self, env=None) -> None:
-        # EMPTY PLACEHOLDER — IMPLEMENTATION LATER (Phase 3, Person 2).
-        self._env = env
+    def __init__(self, env: MockEnvironment | None = None) -> None:
+        self._env: MockEnvironment = env or MockEnvironment()
 
     # ---------- sensors ----------
 
@@ -26,16 +31,18 @@ class SensorimotorAPI:
         self,
         direction: Literal["front", "left", "right", "back"] = "front",
     ) -> SensorPayload:
-        raise NotImplementedError("Phase 3 — see PROJECT_PLAN.md section G.2.")
+        return sensors.read_lidar(
+            self._env.world_state, direction, observed_at=self._env.now
+        )
 
     def sense_camera(
         self,
         direction: Literal["front", "left", "right", "back"] = "front",
     ) -> SensorPayload:
-        raise NotImplementedError("Phase 3 — see PROJECT_PLAN.md section G.2.")
+        raise NotImplementedError("Phase 3 — sense_camera lands with Scenario B.")
 
     def sense_clock(self) -> SensorPayload:
-        raise NotImplementedError("Phase 3 — see PROJECT_PLAN.md section G.2.")
+        raise NotImplementedError("Phase 3 — sense_clock lands with Scenario B.")
 
     # ---------- actuators (feature-flagged off for epistemic tests) ----------
 
@@ -55,4 +62,4 @@ class SensorimotorAPI:
     # ---------- debug (never exposed to the LLM) ----------
 
     def describe_world(self) -> dict:
-        raise NotImplementedError("Phase 3 — debug helper.")
+        return self._env.describe()
