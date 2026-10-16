@@ -4,3 +4,7 @@ pyyaml==6.0.2
 python-dotenv==1.0.1
 groq==0.11.0
 rich==13.9.2
+
+# --- HTTP API (React frontend) ---
+fastapi==0.115.4
+uvicorn[standard]==0.32.0
