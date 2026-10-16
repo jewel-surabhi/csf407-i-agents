@@ -73,7 +73,7 @@ class LLMClient:
 
     def __init__(
         self,
-        model: str = "llama-3.1-8b-instant",
+        model: str = "openai/gpt-oss-20b",
         temperature: float = 0.0,
         max_tokens: int = 1024,
         timeout_s: float = 30.0,

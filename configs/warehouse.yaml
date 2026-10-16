@@ -1,0 +1,76 @@
+# Warehouse 7 — demo topology for the navigation + inventory co-pilot.
+#
+# This is DEMO application data, not part of the epistemic core. It seeds the
+# declarative layer so that:
+#   * each segment's passability is a real belief (map vs sensor = Scenario A)
+#   * each shelf's stock is a multi-source belief (ERP/scanner/sales = Scenario B)
+#
+# Confidence shown in the UI is the belief's confidence after conflict
+# resolution — never invented.
+
+id: warehouse_7
+start: A-S          # AGV-1 starts here
+goal: WIDGET-42     # the target shelf
+
+# Junctions: aisle (A/B/C) x cross-aisle (N/M/S). x,y are for the floor render.
+junctions:
+  A-N: {label: "Aisle A · North", x: 320, y: 170}
+  A-M: {label: "Aisle A · Mid",   x: 320, y: 360}
+  A-S: {label: "Aisle A · South", x: 320, y: 545}
+  B-N: {label: "Aisle B · North", x: 560, y: 170}
+  B-M: {label: "Aisle B · Mid",   x: 560, y: 360}
+  B-S: {label: "Aisle B · South", x: 560, y: 545}
+  C-N: {label: "Aisle C · North", x: 800, y: 170}
+  C-M: {label: "Aisle C · Mid",   x: 800, y: 360}
+  C-S: {label: "Aisle C · South", x: 800, y: 545}
+
+# Segments connect adjacent junctions. Each seeds ONE passability belief:
+#   state: clear   -> is_clear belief from `source` at `confidence`
+#   state: blocked -> is_blocked belief from `source` at `confidence`
+# A `source` that is a sensor (lidar/scanner/camera) reads as "confirmed";
+# default_map reads as "unverified".
+segments:
+  - {a: A-S, b: B-S, state: clear,   source: warehouse_scanner, confidence: 0.93}
+  - {a: B-S, b: C-S, state: clear,   source: warehouse_scanner, confidence: 0.90}
+  - {a: A-S, b: A-M, state: clear,   source: lidar_front,       confidence: 0.88}
+  - {a: B-S, b: B-M, state: blocked, source: lidar_front,       confidence: 0.95}  # the Scenario-A conflict
+  - {a: C-S, b: C-M, state: clear,   source: lidar_front,       confidence: 0.94}
+  - {a: A-M, b: A-N, state: clear,   source: default_map,       confidence: 0.58}  # map only
+  - {a: B-M, b: B-N, state: clear,   source: default_map,       confidence: 0.60}  # map only
+  - {a: C-M, b: C-N, state: clear,   source: warehouse_scanner, confidence: 0.95}
+  - {a: A-M, b: B-M, state: clear,   source: warehouse_scanner, confidence: 0.85}
+  - {a: B-M, b: C-M, state: clear,   source: warehouse_scanner, confidence: 0.82}
+  - {a: A-N, b: B-N, state: clear,   source: default_map,       confidence: 0.55}  # map only
+  - {a: B-N, b: C-N, state: clear,   source: warehouse_scanner, confidence: 0.90}
+
+# Shelves hang beside a junction. `dx`/`dy` offset the render from the junction.
+# Multi-source stock becomes perspective-tagged beliefs (Scenario B).
+shelves:
+  - id: WIDGET-42
+    near: C-N
+    dx: 46
+    dy: -6
+    target: true
+    stock:
+      - {source: erp_system,        perspective: "third_party:erp",     predicate: count,   value: 50, note: "synced yesterday"}
+      - {source: warehouse_scanner, perspective: self,                  predicate: count,   value: 48, note: "09:00 today"}
+      - {source: sales_log,         perspective: "third_party:sales",   predicate: shipped, value: 3,  note: "shipped 12:15"}
+  - id: BOLT-08
+    near: A-M
+    dx: -46
+    dy: 0
+    stock:
+      - {source: warehouse_scanner, perspective: self, predicate: count, value: 118, note: "09:00 today"}
+  - id: GEAR-30
+    near: B-S
+    dx: 46
+    dy: 0
+    low: true
+    stock:
+      - {source: warehouse_scanner, perspective: self, predicate: count, value: 9, note: "09:00 today"}
+  - id: PANEL-07
+    near: C-S
+    dx: 46
+    dy: 0
+    stock:
+      - {source: warehouse_scanner, perspective: self, predicate: count, value: 41, note: "09:00 today"}
