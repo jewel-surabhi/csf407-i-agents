@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from iagent.api.routes import router
+from iagent.api.warehouse_routes import router as warehouse_router
 
 app = FastAPI(
     title="I, Agent API",
@@ -37,3 +38,4 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(warehouse_router)
