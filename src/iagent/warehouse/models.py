@@ -92,3 +92,21 @@ class TransferResult(BaseModel):
     source_after: int | None = None
     dest_after: int | None = None
     message: str
+
+
+class ShelfLot(BaseModel):
+    """One SKU parcel stored on a shelf (bin)."""
+
+    sku: str
+    quantity: int
+    source: str
+    confidence: float
+    is_native: bool  # True if this lot is the shelf's own primary SKU, False if transferred-in
+
+
+class ShelfContents(BaseModel):
+    """All lots currently stored on a shelf, newest additions last."""
+
+    shelf: str
+    lots: list[ShelfLot]
+    total_units: int

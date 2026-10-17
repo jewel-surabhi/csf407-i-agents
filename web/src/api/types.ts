@@ -85,6 +85,20 @@ export interface TransferResult {
   message: string;
 }
 
+export interface ShelfLot {
+  sku: string;
+  quantity: number;
+  source: string;
+  confidence: number;
+  is_native: boolean;
+}
+
+export interface ShelfContents {
+  shelf: string;
+  lots: ShelfLot[];
+  total_units: number;
+}
+
 // /api/query (the live agent)
 export interface TraceStep {
   idx: number;

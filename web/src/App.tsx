@@ -4,6 +4,7 @@ import type {
   AgentResult,
   InventoryView,
   Shelf,
+  ShelfContents,
   WarehouseView,
 } from "./api/types";
 import WarehouseFloor from "./components/WarehouseFloor";
@@ -39,6 +40,8 @@ export default function App() {
   const [tab, setTab] = useState<"reason" | "trust">("reason");
   const [shelfSel, setShelfSel] = useState<Shelf | null>(null);
   const [inv, setInv] = useState<InventoryView | null>(null);
+  const [bin, setBin] = useState<ShelfContents | null>(null);
+  const [recentArrival, setRecentArrival] = useState<string | null>(null);
   const [xferDest, setXferDest] = useState<string>("");
   const [xferQty, setXferQty] = useState<number>(10);
   const [answer, setAnswer] = useState<AgentResult | null>(null);
@@ -92,12 +95,19 @@ export default function App() {
     const sh = view.shelves.find((s) => s.id === id) ?? null;
     setShelfSel(sh);
     setInv(null);
+    setBin(null);
+    setRecentArrival(null);
     const others = view.shelves.filter((s) => s.id !== id);
     setXferDest(others[0]?.id ?? "");
     try {
-      setInv(await api.inventory(id));
+      // Fetch both: the per-SKU reconciliation (shows the multi-source dispute)
+      // AND the shelf's full contents (shows every lot stored here, including
+      // units transferred in).
+      const [i, b] = await Promise.all([api.inventory(id), api.bin(id)]);
+      setInv(i);
+      setBin(b);
     } catch {
-      /* single-source shelves still show from seed */
+      /* leave null */
     }
   }, [view]);
 
@@ -105,13 +115,30 @@ export default function App() {
     if (!shelfSel) return;
     try {
       const res = await api.transfer(shelfSel.id, xferDest, xferQty);
-      if (res.ok) {
-        toast("var(--clear)", `Moved <b>${res.quantity} × ${res.sku}</b> → ${res.dest_shelf}`);
-        setView(await api.getWarehouse());
-        setInv(await api.inventory(shelfSel.id));
-      } else {
+      if (!res.ok) {
         toast("var(--blocked)", res.message);
+        return;
       }
+      toast("var(--clear)", `Moved <b>${res.quantity} × ${res.sku}</b> → ${res.dest_shelf}`);
+      // Refresh everything the transfer affected: the warehouse view (so the
+      // floor is current), the source's reconciliation and bin, AND the
+      // destination's bin — so the user SEES the +K units land there.
+      const [v, srcInv, srcBin, destBin] = await Promise.all([
+        api.getWarehouse(),
+        api.inventory(shelfSel.id),
+        api.bin(shelfSel.id),
+        api.bin(xferDest),
+      ]);
+      setView(v);
+      setInv(srcInv);
+      setBin(srcBin);
+      setRecentArrival(
+        `+${res.quantity} ${res.sku} just landed at ${res.dest_shelf} — ` +
+          `${res.dest_shelf} now holds ${destBin.total_units} total units ` +
+          `(${destBin.lots.length} lot${destBin.lots.length === 1 ? "" : "s"}).`,
+      );
+      // Hide the arrival line after a few seconds so the panel reads normally again.
+      setTimeout(() => setRecentArrival(null), 6000);
     } catch (e) {
       toast("var(--blocked)", String(e));
     }
@@ -225,8 +252,12 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
               </span>
             </div>
             <div className="ctx-b">
-              <div className="srcrow"><span className="nm">Location</span><span className="ct">{view.junctions[shelfSel.near]?.label}</span></div>
-              {inv && inv.sources.length > 1 ? (
+              <div className="srcrow">
+                <span className="nm">Location</span>
+                <span className="ct">{view.junctions[shelfSel.near]?.label}</span>
+              </div>
+
+              {inv && inv.sources.length > 1 && (
                 <>
                   <div style={{ fontSize: 12, color: "var(--ink-2)" }}>Sources disagree:</div>
                   {inv.sources.map((s, i) => (
@@ -237,8 +268,38 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
                   ))}
                   <div className="reconcile">✓ Reconciled to <b>≈ {inv.reconciled}</b> — {inv.explanation}</div>
                 </>
-              ) : (
-                <div className="srcrow"><span className="nm">On hand</span><span className="ct">{inv?.reconciled ?? shelfSel.stock[0]?.value} units</span></div>
+              )}
+
+              {bin && (
+                <>
+                  <div style={{ fontSize: 11, color: "var(--ink-2)", textTransform: "uppercase",
+                                 letterSpacing: ".06em", marginTop: 2 }}>
+                    Bin contents · total {bin.total_units}
+                  </div>
+                  {bin.lots.length === 0 ? (
+                    <div className="srcrow"><span className="nm" style={{ color: "var(--ink-3)" }}>Empty.</span></div>
+                  ) : bin.lots.map((lot, i) => (
+                    <div className="srcrow" key={i} style={{
+                      padding: "6px 9px", borderRadius: 7,
+                      background: lot.is_native ? "var(--panel-2)" : "var(--clear-bg)",
+                      border: "1px solid " + (lot.is_native ? "var(--line)" : "var(--clear)"),
+                    }}>
+                      <span className="nm">
+                        <b>{lot.sku}</b>{" "}
+                        {lot.is_native
+                          ? <span className="tw">· native</span>
+                          : <span className="tw" style={{ color: "var(--clear)" }}>· transferred in</span>}
+                      </span>
+                      <span className="ct">{lot.quantity}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {recentArrival && (
+                <div className="reconcile" style={{ background: "var(--clear-bg)", color: "var(--clear)" }}>
+                  {recentArrival}
+                </div>
               )}
 
               <div className="xfer">

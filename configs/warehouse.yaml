@@ -13,16 +13,17 @@ start: A-S          # AGV-1 starts here
 goal: WIDGET-42     # the target shelf
 
 # Junctions: aisle (A/B/C) x cross-aisle (N/M/S). x,y are for the floor render.
+# Spread wider inside the 1040x660 viewBox so the floor reads clearly at large sizes.
 junctions:
-  A-N: {label: "Aisle A · North", x: 320, y: 170}
-  A-M: {label: "Aisle A · Mid",   x: 320, y: 360}
-  A-S: {label: "Aisle A · South", x: 320, y: 545}
-  B-N: {label: "Aisle B · North", x: 560, y: 170}
-  B-M: {label: "Aisle B · Mid",   x: 560, y: 360}
-  B-S: {label: "Aisle B · South", x: 560, y: 545}
-  C-N: {label: "Aisle C · North", x: 800, y: 170}
-  C-M: {label: "Aisle C · Mid",   x: 800, y: 360}
-  C-S: {label: "Aisle C · South", x: 800, y: 545}
+  A-N: {label: "Aisle A · North", x: 280, y: 140}
+  A-M: {label: "Aisle A · Mid",   x: 280, y: 350}
+  A-S: {label: "Aisle A · South", x: 280, y: 555}
+  B-N: {label: "Aisle B · North", x: 540, y: 140}
+  B-M: {label: "Aisle B · Mid",   x: 540, y: 350}
+  B-S: {label: "Aisle B · South", x: 540, y: 555}
+  C-N: {label: "Aisle C · North", x: 800, y: 140}
+  C-M: {label: "Aisle C · Mid",   x: 800, y: 350}
+  C-S: {label: "Aisle C · South", x: 800, y: 555}
 
 # Segments connect adjacent junctions. Each seeds ONE passability belief:
 #   state: clear   -> is_clear belief from `source` at `confidence`

@@ -24,11 +24,18 @@ from iagent.declarative.api import KnowledgeAPI
 from iagent.declarative.belief_graph import BeliefGraph
 from iagent.declarative.provenance import ProvenanceStore
 from iagent.declarative.seeding import seed_sources
-from iagent.warehouse.models import InventoryView, MoveOption, Topology, TransferResult
+from iagent.warehouse.models import (
+    InventoryView,
+    MoveOption,
+    ShelfContents,
+    Topology,
+    TransferResult,
+)
 from iagent.warehouse.service import (
     evaluate_moves,
     reconcile_inventory,
     seed_warehouse,
+    shelf_contents,
     transfer,
 )
 from iagent.warehouse.topology import load_topology, neighbors
@@ -134,6 +141,12 @@ def do_move(req: MoveRequest, wh: WH) -> WarehouseView:
 def get_inventory(sku: str, wh: WH) -> InventoryView:
     """Reconcile a SKU across its source perspectives."""
     return reconcile_inventory(wh.knowledge, sku)
+
+
+@router.get("/bin/{shelf_id}", response_model=ShelfContents)
+def get_bin(shelf_id: str, wh: WH) -> ShelfContents:
+    """List every lot currently stored at a shelf (bin), including transferred-in."""
+    return shelf_contents(wh.knowledge, wh.topo, shelf_id)
 
 
 @router.post("/transfer", response_model=TransferResult)

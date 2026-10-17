@@ -65,8 +65,8 @@ button{font-family:inherit}
 
 /* stage */
 .stage{position:relative;flex:1;min-height:0;overflow:hidden}
-.floorwrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:12px}
-svg.floor{width:100%;height:100%;max-width:1060px;display:block}
+.floorwrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:8px}
+svg.floor{width:100%;height:100%;max-width:1500px;display:block}
 svg.floor text{font-family:var(--f-sign)}
 .seg{transition:opacity .12s}
 .seg.reachable{cursor:pointer}

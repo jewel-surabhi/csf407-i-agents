@@ -20,6 +20,8 @@ from iagent.declarative.api import Belief, KnowledgeAPI
 from iagent.warehouse.models import (
     InventoryView,
     MoveOption,
+    ShelfContents,
+    ShelfLot,
     SourceCount,
     Topology,
     TransferResult,
@@ -166,6 +168,50 @@ def reconcile_inventory(knowledge: KnowledgeAPI, sku: str) -> InventoryView:
                if shipped_total else f" → {reconciled}."))
     return InventoryView(sku=sku, reconciled=reconciled, confidence=round(conf, 2),
                          winning_source=src, sources=rows, explanation=expl)
+
+
+def shelf_contents(knowledge: KnowledgeAPI, topo: Topology, shelf_id: str) -> ShelfContents:
+    """Everything stored at `shelf_id` right now, reconciled from beliefs.
+
+    A shelf (bin) can hold:
+      * its own primary SKU — e.g. PANEL-07 at bin PANEL-07
+      * any lots transferred in from elsewhere — subject = "<sku>@<shelf_id>"
+    """
+    lots: list[ShelfLot] = []
+
+    # 1) Primary SKU — the bin's own stock. If this bin IS a shelf id and holds
+    #    its own SKU, its reconciled count lives at subject == shelf_id.
+    primary = reconcile_inventory(knowledge, shelf_id)
+    if primary.reconciled > 0 or primary.winning_source != "none":
+        lots.append(ShelfLot(
+            sku=shelf_id, quantity=max(0, primary.reconciled),
+            source=primary.winning_source, confidence=primary.confidence,
+            is_native=True,
+        ))
+
+    # 2) Transferred-in lots — subjects shaped "<sku>@<shelf_id>".
+    #    We scan the per-shelf list for any shelves whose SKU might have been
+    #    moved here. Each shelf's SKU is the shelf id in our seed model.
+    for sh in topo.shelves:
+        if sh.id == shelf_id:
+            continue  # primary already handled
+        subject = f"{sh.id}@{shelf_id}"
+        b = knowledge.get_belief(subject, "count")
+        if b is None:
+            continue
+        try:
+            qty = int(b.object)
+        except (TypeError, ValueError):
+            continue
+        if qty <= 0:
+            continue
+        lots.append(ShelfLot(
+            sku=sh.id, quantity=qty, source=b.source,
+            confidence=round(b.confidence, 2), is_native=False,
+        ))
+
+    total = sum(lot.quantity for lot in lots)
+    return ShelfContents(shelf=shelf_id, lots=lots, total_units=total)
 
 
 def transfer(knowledge: KnowledgeAPI, topo: Topology, sku: str,
