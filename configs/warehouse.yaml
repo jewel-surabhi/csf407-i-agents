@@ -1,54 +1,92 @@
-# Warehouse 7 — demo topology for the navigation + inventory co-pilot.
+# Warehouse 7 — 5 aisles (A–E) × 4 cross-aisles (N / U / D / S) = 20 junctions.
 #
-# This is DEMO application data, not part of the epistemic core. It seeds the
-# declarative layer so that:
-#   * each segment's passability is a real belief (map vs sensor = Scenario A)
-#   * each shelf's stock is a multi-source belief (ERP/scanner/sales = Scenario B)
+# Still demo data, not part of the epistemic core. Every segment is seeded
+# as ONE belief in the declarative layer so grounded confidence stays real:
+#   state: clear   -> is_clear belief from `source` at `confidence`
+#   state: blocked -> is_blocked belief (overrides any map claim)
 #
-# Confidence shown in the UI is the belief's confidence after conflict
-# resolution — never invented.
+# Shelves hang off aisles; each has one native SKU (and can accept
+# transferred-in lots at runtime).
 
 id: warehouse_7
-start: A-S          # AGV-1 starts here
-goal: WIDGET-42     # the target shelf
+start: A-S          # AGV-1 starts at the loading bay side
+goal: WIDGET-42     # top-right pick face
 
-# Junctions: aisle (A/B/C) x cross-aisle (N/M/S). x,y are for the floor render.
-# Spread wider inside the 1040x660 viewBox so the floor reads clearly at large sizes.
+# Junctions. Aisles A..E across (280..1000), cross-aisles N/U/D/S down (120..580).
 junctions:
-  A-N: {label: "Aisle A · North", x: 280, y: 140}
-  A-M: {label: "Aisle A · Mid",   x: 280, y: 350}
-  A-S: {label: "Aisle A · South", x: 280, y: 555}
-  B-N: {label: "Aisle B · North", x: 540, y: 140}
-  B-M: {label: "Aisle B · Mid",   x: 540, y: 350}
-  B-S: {label: "Aisle B · South", x: 540, y: 555}
-  C-N: {label: "Aisle C · North", x: 800, y: 140}
-  C-M: {label: "Aisle C · Mid",   x: 800, y: 350}
-  C-S: {label: "Aisle C · South", x: 800, y: 555}
+  A-N: {label: "Aisle A · North", x: 280, y: 120}
+  B-N: {label: "Aisle B · North", x: 460, y: 120}
+  C-N: {label: "Aisle C · North", x: 640, y: 120}
+  D-N: {label: "Aisle D · North", x: 820, y: 120}
+  E-N: {label: "Aisle E · North", x: 1000, y: 120}
 
-# Segments connect adjacent junctions. Each seeds ONE passability belief:
-#   state: clear   -> is_clear belief from `source` at `confidence`
-#   state: blocked -> is_blocked belief from `source` at `confidence`
-# A `source` that is a sensor (lidar/scanner/camera) reads as "confirmed";
-# default_map reads as "unverified".
+  A-U: {label: "Aisle A · Upper", x: 280, y: 275}
+  B-U: {label: "Aisle B · Upper", x: 460, y: 275}
+  C-U: {label: "Aisle C · Upper", x: 640, y: 275}
+  D-U: {label: "Aisle D · Upper", x: 820, y: 275}
+  E-U: {label: "Aisle E · Upper", x: 1000, y: 275}
+
+  A-D: {label: "Aisle A · Lower", x: 280, y: 430}
+  B-D: {label: "Aisle B · Lower", x: 460, y: 430}
+  C-D: {label: "Aisle C · Lower", x: 640, y: 430}
+  D-D: {label: "Aisle D · Lower", x: 820, y: 430}
+  E-D: {label: "Aisle E · Lower", x: 1000, y: 430}
+
+  A-S: {label: "Aisle A · South", x: 280, y: 580}
+  B-S: {label: "Aisle B · South", x: 460, y: 580}
+  C-S: {label: "Aisle C · South", x: 640, y: 580}
+  D-S: {label: "Aisle D · South", x: 820, y: 580}
+  E-S: {label: "Aisle E · South", x: 1000, y: 580}
+
+# Segments. Vertical runs within each aisle + horizontal cross-aisles at each row.
 segments:
+  # ─── vertical: Aisle A ───
+  - {a: A-S, b: A-D, state: clear,   source: lidar_front,       confidence: 0.88}
+  - {a: A-D, b: A-U, state: clear,   source: warehouse_scanner, confidence: 0.90}
+  - {a: A-U, b: A-N, state: clear,   source: default_map,       confidence: 0.58}  # unverified
+  # ─── vertical: Aisle B ───
+  - {a: B-S, b: B-D, state: blocked, source: lidar_front,       confidence: 0.95}  # THE Scenario-A conflict
+  - {a: B-D, b: B-U, state: clear,   source: default_map,       confidence: 0.60}
+  - {a: B-U, b: B-N, state: clear,   source: default_map,       confidence: 0.55}
+  # ─── vertical: Aisle C (central) ───
+  - {a: C-S, b: C-D, state: clear,   source: lidar_front,       confidence: 0.94}
+  - {a: C-D, b: C-U, state: clear,   source: warehouse_scanner, confidence: 0.92}
+  - {a: C-U, b: C-N, state: clear,   source: warehouse_scanner, confidence: 0.95}
+  # ─── vertical: Aisle D ───
+  - {a: D-S, b: D-D, state: clear,   source: warehouse_scanner, confidence: 0.89}
+  - {a: D-D, b: D-U, state: blocked, source: lidar_front,       confidence: 0.88}  # second conflict
+  - {a: D-U, b: D-N, state: clear,   source: default_map,       confidence: 0.60}
+  # ─── vertical: Aisle E ───
+  - {a: E-S, b: E-D, state: clear,   source: warehouse_scanner, confidence: 0.91}
+  - {a: E-D, b: E-U, state: clear,   source: lidar_front,       confidence: 0.90}
+  - {a: E-U, b: E-N, state: clear,   source: warehouse_scanner, confidence: 0.93}
+
+  # ─── horizontal: South cross-aisle ───
   - {a: A-S, b: B-S, state: clear,   source: warehouse_scanner, confidence: 0.93}
   - {a: B-S, b: C-S, state: clear,   source: warehouse_scanner, confidence: 0.90}
-  - {a: A-S, b: A-M, state: clear,   source: lidar_front,       confidence: 0.88}
-  - {a: B-S, b: B-M, state: blocked, source: lidar_front,       confidence: 0.95}  # the Scenario-A conflict
-  - {a: C-S, b: C-M, state: clear,   source: lidar_front,       confidence: 0.94}
-  - {a: A-M, b: A-N, state: clear,   source: default_map,       confidence: 0.58}  # map only
-  - {a: B-M, b: B-N, state: clear,   source: default_map,       confidence: 0.60}  # map only
-  - {a: C-M, b: C-N, state: clear,   source: warehouse_scanner, confidence: 0.95}
-  - {a: A-M, b: B-M, state: clear,   source: warehouse_scanner, confidence: 0.85}
-  - {a: B-M, b: C-M, state: clear,   source: warehouse_scanner, confidence: 0.82}
-  - {a: A-N, b: B-N, state: clear,   source: default_map,       confidence: 0.55}  # map only
+  - {a: C-S, b: D-S, state: clear,   source: warehouse_scanner, confidence: 0.91}
+  - {a: D-S, b: E-S, state: clear,   source: warehouse_scanner, confidence: 0.88}
+  # ─── horizontal: Lower cross-aisle ───
+  - {a: A-D, b: B-D, state: clear,   source: warehouse_scanner, confidence: 0.85}
+  - {a: B-D, b: C-D, state: clear,   source: warehouse_scanner, confidence: 0.82}
+  - {a: C-D, b: D-D, state: clear,   source: default_map,       confidence: 0.60}  # unverified
+  - {a: D-D, b: E-D, state: clear,   source: warehouse_scanner, confidence: 0.87}
+  # ─── horizontal: Upper cross-aisle ───
+  - {a: A-U, b: B-U, state: clear,   source: warehouse_scanner, confidence: 0.86}
+  - {a: B-U, b: C-U, state: clear,   source: warehouse_scanner, confidence: 0.84}
+  - {a: C-U, b: D-U, state: clear,   source: warehouse_scanner, confidence: 0.88}
+  - {a: D-U, b: E-U, state: clear,   source: default_map,       confidence: 0.56}  # unverified
+  # ─── horizontal: North cross-aisle ───
+  - {a: A-N, b: B-N, state: clear,   source: default_map,       confidence: 0.55}
   - {a: B-N, b: C-N, state: clear,   source: warehouse_scanner, confidence: 0.90}
+  - {a: C-N, b: D-N, state: clear,   source: warehouse_scanner, confidence: 0.92}
+  - {a: D-N, b: E-N, state: clear,   source: warehouse_scanner, confidence: 0.89}
 
-# Shelves hang beside a junction. `dx`/`dy` offset the render from the junction.
-# Multi-source stock becomes perspective-tagged beliefs (Scenario B).
+# Shelves hang beside aisle junctions. Each has one native SKU; bins can
+# accept transferred-in lots at runtime.
 shelves:
   - id: WIDGET-42
-    near: C-N
+    near: E-N
     dx: 46
     dy: -6
     target: true
@@ -57,7 +95,7 @@ shelves:
       - {source: warehouse_scanner, perspective: self,                  predicate: count,   value: 48, note: "09:00 today"}
       - {source: sales_log,         perspective: "third_party:sales",   predicate: shipped, value: 3,  note: "shipped 12:15"}
   - id: BOLT-08
-    near: A-M
+    near: A-U
     dx: -46
     dy: 0
     stock:
@@ -70,8 +108,33 @@ shelves:
     stock:
       - {source: warehouse_scanner, perspective: self, predicate: count, value: 9, note: "09:00 today"}
   - id: PANEL-07
-    near: C-S
+    near: D-S
     dx: 46
     dy: 0
     stock:
       - {source: warehouse_scanner, perspective: self, predicate: count, value: 41, note: "09:00 today"}
+  - id: ROTOR-12
+    near: C-U
+    dx: 46
+    dy: 0
+    stock:
+      - {source: warehouse_scanner, perspective: self, predicate: count, value: 24, note: "09:00 today"}
+  - id: CABLE-55
+    near: D-N
+    dx: -46
+    dy: 0
+    low: true
+    stock:
+      - {source: warehouse_scanner, perspective: self, predicate: count, value: 7, note: "09:00 today"}
+  - id: SCREW-02
+    near: A-D
+    dx: 46
+    dy: 0
+    stock:
+      - {source: warehouse_scanner, perspective: self, predicate: count, value: 212, note: "09:00 today"}
+  - id: HINGE-21
+    near: E-U
+    dx: 46
+    dy: 0
+    stock:
+      - {source: warehouse_scanner, perspective: self, predicate: count, value: 33, note: "09:00 today"}

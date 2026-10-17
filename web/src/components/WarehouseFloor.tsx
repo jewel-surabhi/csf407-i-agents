@@ -20,23 +20,23 @@ export default function WarehouseFloor({ view, pathMap, onMove, onSelectShelf }:
   return (
     <svg
       className="floor"
-      viewBox="0 0 1040 660"
+      viewBox="0 0 1240 700"
       preserveAspectRatio="xMidYMid meet"
       aria-label="Warehouse floor"
     >
-      <rect x="8" y="8" width="1024" height="644" rx="18" fill="var(--floor)" stroke="var(--line)" />
+      <rect x="8" y="8" width="1224" height="684" rx="18" fill="var(--floor)" stroke="var(--line)" />
       <g opacity="0.5">
-        {Array.from({ length: 16 }, (_, i) => 70 + i * 58).map((x) => (
-          <line key={"vx" + x} x1={x} y1="20" x2={x} y2="632" stroke="var(--floor-2)" strokeWidth="1" />
+        {Array.from({ length: 20 }, (_, i) => 70 + i * 58).map((x) => (
+          <line key={"vx" + x} x1={x} y1="20" x2={x} y2="672" stroke="var(--floor-2)" strokeWidth="1" />
         ))}
-        {Array.from({ length: 10 }, (_, i) => 70 + i * 58).map((y) => (
-          <line key={"hz" + y} x1="20" y1={y} x2="1020" y2={y} stroke="var(--floor-2)" strokeWidth="1" />
+        {Array.from({ length: 11 }, (_, i) => 70 + i * 58).map((y) => (
+          <line key={"hz" + y} x1="20" y1={y} x2="1220" y2={y} stroke="var(--floor-2)" strokeWidth="1" />
         ))}
       </g>
 
-      {/* zone strips */}
-      <ZoneStrip label="LOADING BAY" x={24} y={90} w={116} h={470} hazardRight />
-      <ZoneStrip label="DISPATCH" x={900} y={90} w={116} h={470} />
+      {/* zone strips — flank the whole aisle grid (A..E) */}
+      <ZoneStrip label="LOADING BAY" x={20} y={80} w={110} h={520} hazardRight />
+      <ZoneStrip label="DISPATCH" x={1110} y={80} w={110} h={520} />
 
       {/* segments */}
       {view.segments.map((s) => {

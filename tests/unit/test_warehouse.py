@@ -51,8 +51,10 @@ def test_topology_loads(topo):
     assert topo.id == "warehouse_7"
     assert topo.start == "A-S"
     assert topo.goal == "WIDGET-42"
-    assert len(topo.junctions) == 9
-    assert len(topo.segments) == 12
+    # 5 aisles (A..E) x 4 rows (N/U/D/S) = 20 junctions.
+    assert len(topo.junctions) == 20
+    # 5 verticals x 3 + 4 horizontals x 4 = 15 + 16 = 31 segments.
+    assert len(topo.segments) == 31
 
 
 def test_segment_id_is_order_independent():
@@ -64,22 +66,20 @@ def test_segment_id_is_order_independent():
 
 def test_moves_from_start_are_scored_and_sorted(knowledge, topo):
     opts = evaluate_moves(knowledge, topo, "A-S")
-    assert len(opts) == 2  # A-S connects to B-S and A-M
-    # sorted best-first
-    assert opts[0].confidence >= opts[1].confidence
-    tos = {o.to for o in opts}
-    assert tos == {"B-S", "A-M"}
+    assert len(opts) == 2  # A-S connects to B-S (horizontal) and A-D (vertical)
+    assert opts[0].confidence >= opts[1].confidence  # sorted best-first
+    assert {o.to for o in opts} == {"B-S", "A-D"}
 
 
 def test_blocked_segment_scores_low_from_sensor_conflict(knowledge, topo):
-    """The mid-aisle B-S<->B-M is seeded blocked by LiDAR at 0.95 -> passability ~0.05."""
+    """B-S <-> B-D is seeded blocked by LiDAR at 0.95 -> passability ~0.05."""
     opts = evaluate_moves(knowledge, topo, "B-S")
-    bm = next(o for o in opts if o.to == "B-M")
-    assert bm.passable is False
-    assert bm.confidence <= 0.15
-    assert bm.tier == "low"
-    assert "obstruction" in bm.reason.lower()
-    assert bm.source == "lidar_front"
+    bd = next(o for o in opts if o.to == "B-D")
+    assert bd.passable is False
+    assert bd.confidence <= 0.15
+    assert bd.tier == "low"
+    assert "obstruction" in bd.reason.lower()
+    assert bd.source == "lidar_front"
 
 
 def test_sensor_confirmed_segment_scores_high(knowledge, topo):
@@ -92,8 +92,8 @@ def test_sensor_confirmed_segment_scores_high(knowledge, topo):
 
 
 def test_map_only_segment_scores_medium_and_unverified(knowledge, topo):
-    """A-M<->A-N is map-only at 0.58 -> medium, flagged unverified."""
-    opts = evaluate_moves(knowledge, topo, "A-M")
+    """A-U <-> A-N is map-only at 0.58 -> medium, flagged unverified."""
+    opts = evaluate_moves(knowledge, topo, "A-U")
     an = next(o for o in opts if o.to == "A-N")
     assert an.tier == "medium"
     assert an.source == "default_map"
@@ -105,8 +105,10 @@ def test_unknown_junction_yields_no_moves(knowledge, topo):
 
 
 def test_high_confidence_route_to_goal_exists(knowledge, topo):
-    """The honest route A-S -> B-S -> C-S -> C-M -> C-N must be all high-confidence."""
-    route = ["A-S", "B-S", "C-S", "C-M", "C-N"]
+    """A sensor-confirmed route from the start to the goal shelf (near E-N) must
+    exist. South cross-aisle to Aisle C, straight up, east along the north, into
+    E-N — every leg is scanner- or LiDAR-confirmed."""
+    route = ["A-S", "B-S", "C-S", "C-D", "C-U", "C-N", "D-N", "E-N"]
     for a, b in zip(route[:-1], route[1:], strict=True):
         opts = evaluate_moves(knowledge, topo, a)
         leg = next(o for o in opts if o.to == b)
