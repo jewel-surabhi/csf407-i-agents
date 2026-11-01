@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -29,7 +29,17 @@ __all__ = [
     "LLMClientError",
     "RecordedLLMClient",
     "ScriptExhausted",
+    "DEFAULT_MODEL",
+    "MALFORMED_ARGS_KEY",
 ]
+
+# Open-weight, tool-calling, available on the Groq free tier. Overridable via
+# `LLM_MODEL` in .env or the `llm.model` key in configs/default.yaml.
+DEFAULT_MODEL = "openai/gpt-oss-20b"
+
+# Where unparseable tool-call arguments are stashed so the dispatcher reports a
+# recoverable `missing_argument` instead of the loop crashing.
+MALFORMED_ARGS_KEY = "__raw__"
 
 
 class LLMClientError(RuntimeError):
@@ -51,12 +61,19 @@ class ToolCallRequest:
 
 @dataclass(frozen=True)
 class AssistantResponse:
-    """Normalized shape of one assistant turn."""
+    """Normalized shape of one assistant turn.
+
+    `malformed` flags a generation whose tool calls did not parse -- unnamed
+    functions, or an `arguments` payload that is not valid JSON. Small
+    instruct-tuned models do this occasionally; `LLMClient` retries such a
+    turn before handing it on.
+    """
 
     content: str | None = None
     tool_calls: list[ToolCallRequest] = field(default_factory=list)
     finish_reason: str | None = None
     raw: dict[str, Any] | None = None
+    malformed: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -73,20 +90,22 @@ class LLMClient:
 
     def __init__(
         self,
-        model: str = "openai/gpt-oss-20b",
-        temperature: float = 0.0,
-        max_tokens: int = 1024,
-        timeout_s: float = 30.0,
-        max_retries: int = 3,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        timeout_s: float | None = None,
+        max_retries: int | None = None,
         api_key: str | None = None,
         client: Any | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
-        self.model = model
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.timeout_s = timeout_s
-        self.max_retries = max_retries
+        # Anything left as None resolves from the environment (.env), then
+        # from the documented default -- so `LLMClient()` honours LLM_MODEL.
+        self.model = model or _env_str("LLM_MODEL") or DEFAULT_MODEL
+        self.temperature = _first_not_none(temperature, _env_float("LLM_TEMPERATURE"), 0.0)
+        self.max_tokens = int(_first_not_none(max_tokens, _env_int("LLM_MAX_TOKENS"), 1024))
+        self.timeout_s = float(_first_not_none(timeout_s, _env_float("LLM_TIMEOUT_S"), 30.0))
+        self.max_retries = int(_first_not_none(max_retries, _env_int("LLM_MAX_RETRIES"), 3))
         self._sleep = sleep
 
         if client is not None:
@@ -103,18 +122,56 @@ class LLMClient:
 
         key = api_key or os.environ.get("GROQ_API_KEY")
         if not key:
+            raise LLMClientError("GROQ_API_KEY is not set. Export it or pass api_key= explicitly.")
+        self._client = Groq(api_key=key, timeout=self.timeout_s)
+
+    @classmethod
+    def from_config(cls, config: Any = None, **overrides: Any) -> LLMClient:
+        """Build a client from the parsed `configs/default.yaml`.
+
+        Precedence, highest first: explicit keyword overrides, environment
+        variables (`.env`), the config file's `llm:` block, then this module's
+        defaults -- matching the note at the top of configs/default.yaml.
+
+        `config` may be a dict or any object exposing an `llm` attribute, so
+        this works before P4's `AppConfig` lands. The `llm.provider` key is
+        read for validation only: Groq is the one supported transport.
+        """
+        block = _llm_block(config)
+        provider = str(block.get("provider", "groq")).lower()
+        if provider not in {"groq", ""}:
             raise LLMClientError(
-                "GROQ_API_KEY is not set. Export it or pass api_key= explicitly."
+                f"Unsupported llm.provider {provider!r}; this client speaks Groq "
+                "(OpenAI-compatible) only."
             )
-        self._client = Groq(api_key=key, timeout=timeout_s)
+
+        settings: dict[str, Any] = {
+            "model": _env_str("LLM_MODEL") or block.get("model"),
+            "temperature": _first_not_none(_env_float("LLM_TEMPERATURE"), block.get("temperature")),
+            "max_tokens": _first_not_none(_env_int("LLM_MAX_TOKENS"), block.get("max_tokens")),
+            "timeout_s": _first_not_none(_env_float("LLM_TIMEOUT_S"), block.get("timeout_s")),
+            "max_retries": _first_not_none(_env_int("LLM_MAX_RETRIES"), block.get("max_retries")),
+        }
+        settings.update({k: v for k, v in overrides.items() if v is not None})
+        return cls(**settings)
 
     def chat_with_tools(
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
     ) -> AssistantResponse:
-        """Call the provider once; retry transient failures with backoff."""
+        """Call the provider, retrying transient failures with backoff.
+
+        A *malformed* generation is retried too: small models sometimes emit a
+        tool call whose `arguments` are not valid JSON, and at temperature 0 a
+        resample is still worth one try. If every attempt comes back malformed
+        the last response is returned anyway rather than raised -- the
+        dispatcher turns it into a `missing_argument` observation the LLM can
+        recover from, which beats aborting the episode.
+        """
         last_exc: Exception | None = None
+        last_malformed: AssistantResponse | None = None
+
         for attempt in range(1, self.max_retries + 1):
             try:
                 raw = self._client.chat.completions.create(
@@ -125,12 +182,24 @@ class LLMClient:
                     temperature=self.temperature,
                     max_tokens=self.max_tokens,
                 )
-                return self._normalize(raw)
             except Exception as exc:  # noqa: BLE001 — provider errors vary widely
                 last_exc = exc
                 if attempt == self.max_retries:
                     break
-                self._sleep(0.5 * (2 ** (attempt - 1)))
+                self._sleep(_backoff(attempt))
+                continue
+
+            response = self._normalize(raw)
+            if not response.malformed:
+                return response
+
+            last_malformed = response
+            if attempt == self.max_retries:
+                break
+            self._sleep(_backoff(attempt))
+
+        if last_malformed is not None:
+            return last_malformed
         raise LLMClientError(
             f"Groq call failed after {self.max_retries} attempts: {last_exc}"
         ) from last_exc
@@ -140,22 +209,90 @@ class LLMClient:
         choice = raw.choices[0]
         message = choice.message
         tool_calls: list[ToolCallRequest] = []
+        malformed = False
+
         for tc in getattr(message, "tool_calls", None) or []:
-            fn = tc.function
-            args_str = fn.arguments or "{}"
-            try:
-                args = json.loads(args_str) if isinstance(args_str, str) else dict(args_str)
-            except json.JSONDecodeError:
-                args = {"__raw__": args_str}
+            fn = getattr(tc, "function", None)
+            name = getattr(fn, "name", None) or ""
+            if not name:
+                malformed = True
+
+            args_str = getattr(fn, "arguments", None) or "{}"
+            if isinstance(args_str, str):
+                try:
+                    args = json.loads(args_str)
+                except json.JSONDecodeError:
+                    args = {MALFORMED_ARGS_KEY: args_str}
+                    malformed = True
+            else:
+                args = args_str
+
+            if not isinstance(args, dict):
+                # e.g. a bare list or string where an object was required.
+                args = {MALFORMED_ARGS_KEY: args}
+                malformed = True
+
             tool_calls.append(
-                ToolCallRequest(id=tc.id, name=fn.name, arguments=args)
+                ToolCallRequest(id=getattr(tc, "id", "") or "", name=name, arguments=args)
             )
+
         return AssistantResponse(
             content=getattr(message, "content", None),
             tool_calls=tool_calls,
             finish_reason=getattr(choice, "finish_reason", None),
             raw=None,
+            malformed=malformed,
         )
+
+
+def _backoff(attempt: int) -> float:
+    """Exponential backoff: 0.5s, 1s, 2s, ..."""
+    return 0.5 * (2 ** (attempt - 1))
+
+
+def _first_not_none(*values: Any) -> Any:
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _llm_block(config: Any) -> Mapping[str, Any]:
+    """Pull the `llm:` mapping out of a dict- or attribute-style config."""
+    if config is None:
+        return {}
+    block = config.get("llm") if isinstance(config, Mapping) else getattr(config, "llm", None)
+    if block is None:
+        return {}
+    if isinstance(block, Mapping):
+        return block
+    # A Pydantic sub-model or similar: expose its fields as a mapping.
+    return dict(getattr(block, "__dict__", {}) or {})
+
+
+def _env_str(name: str) -> str | None:
+    value = os.environ.get(name, "").strip()
+    return value or None
+
+
+def _env_float(name: str) -> float | None:
+    value = _env_str(name)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _env_int(name: str) -> int | None:
+    value = _env_str(name)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
 
 
 # ---------------------------------------------------------------------------
