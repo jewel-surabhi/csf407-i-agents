@@ -85,12 +85,52 @@ def _direction_key(direction: str) -> str:
     }.get(direction, "in_front_of")
 
 
-# --- Camera and clock: implementation lands with Scenario B. ---
+# --- Camera and clock: return preset payloads from the scenario YAML.
+#
+# Unlike LiDAR (which derives its reading from `world_state.obstacles`), the
+# camera's perception is scenario-scripted — the YAML specifies what the
+# camera "sees" so the test author controls perception noise (e.g. box_01
+# perceived as 'brown' under yellow lighting in scenario_b).
 
 
-def read_camera(world_state: WorldState, direction: str = "front", *, observed_at: datetime):
-    raise NotImplementedError("Phase 3 — read_camera lands with Scenario B (P2).")
+def read_camera(
+    world_state: WorldState,
+    direction: str = "front",
+    *,
+    observed_at: datetime,
+    presets: dict | None = None,
+) -> SensorPayload:
+    """Return the scenario's preset camera reading if present, else an empty frame."""
+    sensor_id = f"camera_{direction}"
+    preset = ((presets or {}).get(sensor_id) or {}).get("reading") or {}
+    detections = preset.get("detections", [])
+    ambient = preset.get("ambient", {"lighting": world_state.lighting})
+
+    return SensorPayload(
+        sensor=sensor_id,
+        kind="camera_frame",
+        value=len(detections),
+        status="ok" if detections else "empty",
+        confidence=_avg_detection_confidence(detections),
+        observed_at=observed_at,
+        raw={"detections": detections, "ambient": ambient},
+    )
 
 
-def read_clock(*, observed_at: datetime):
-    raise NotImplementedError("Phase 3 — read_clock lands with Scenario B (P2).")
+def _avg_detection_confidence(detections: list[dict]) -> float:
+    if not detections:
+        return 0.0
+    vals = [float(d.get("confidence", 0.0)) for d in detections]
+    return round(sum(vals) / len(vals), 3)
+
+
+def read_clock(*, observed_at: datetime) -> SensorPayload:
+    return SensorPayload(
+        sensor="clock",
+        kind="iso8601",
+        value=observed_at.isoformat(),
+        status="ok",
+        confidence=1.0,
+        observed_at=observed_at,
+        raw={"now": observed_at.isoformat()},
+    )

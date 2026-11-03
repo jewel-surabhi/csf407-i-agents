@@ -1,0 +1,106 @@
+{
+  "query": "What color does the user believe box_01 is? Keep perspectives separate.",
+  "scenario": "scenario_b",
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "query_perspective",
+        "arguments": {
+          "subject": "box_01",
+          "predicate": "has_color"
+        }
+      },
+      "observation": {
+        "tool": "query_perspective",
+        "ok": true,
+        "content": {
+          "items": [
+            {
+              "perspective": "user",
+              "beliefs": [
+                {
+                  "subject": "box_01",
+                  "predicate": "has_color",
+                  "object": "red_atom",
+                  "confidence": 0.9,
+                  "source": "user",
+                  "perspective": "user",
+                  "status": "active",
+                  "observed_at": "2026-11-03T20:01:48.872134Z",
+                  "provenance_id": 1
+                }
+              ]
+            },
+            {
+              "perspective": "third_party:bot_02",
+              "beliefs": [
+                {
+                  "subject": "box_01",
+                  "predicate": "has_color",
+                  "object": "blue_atom",
+                  "confidence": 0.7,
+                  "source": "bot_02",
+                  "perspective": "third_party:bot_02",
+                  "status": "active",
+                  "observed_at": "2026-11-03T20:01:48.888020Z",
+                  "provenance_id": 2
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "From the user's perspective, box_01 is red_atom (confidence 0.9, source=user). This is their belief \u2014 I have not verified it against my own sensors.",
+          "cited_beliefs": [
+            "box_01/has_color@user"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "From the user's perspective, box_01 is red_atom (confidence 0.9, source=user). This is their belief \u2014 I have not verified it against my own sensors.",
+          "cited_beliefs": [
+            "box_01/has_color@user"
+          ],
+          "cited_sensors": []
+        }
+      },
+      "final_answer": "From the user's perspective, box_01 is red_atom (confidence 0.9, source=user). This is their belief \u2014 I have not verified it against my own sensors."
+    }
+  ],
+  "final_answer": "From the user's perspective, box_01 is red_atom (confidence 0.9, source=user). This is their belief \u2014 I have not verified it against my own sensors.",
+  "started_at": "2026-11-03T20:01:48.909464Z",
+  "ended_at": "2026-11-03T20:01:48.909927Z",
+  "test_id": "05_user_perspective",
+  "recorded_at": "2026-11-03T20:01:48.910806+00:00",
+  "mode": "recorded",
+  "extras": {
+    "scenario": "scenario_b",
+    "expected_tool_calls": [
+      "query_perspective",
+      "finalize_answer"
+    ],
+    "expected_answer_contains": [
+      "red",
+      "user"
+    ],
+    "forbidden_in_answer": [
+      "brown",
+      "blue"
+    ],
+    "verdict": "pass",
+    "failure_mode_tested": "LLM answers from camera/bot_02 data, merging perspectives the user never held."
+  }
+}

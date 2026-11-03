@@ -113,7 +113,14 @@ class LLMClient:
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
     ) -> AssistantResponse:
-        """Call the provider once; retry transient failures with backoff."""
+        """Call the provider once; retry transient failures with backoff.
+
+        A `tool_use_failed` BadRequestError (malformed tool JSON or an invented
+        tool name) is NOT retried — retrying the same prompt reproduces it.
+        Instead we return a free-text AssistantResponse with a diagnostic that
+        the react_loop surfaces as a nudge, giving the model one more chance
+        to produce a well-formed tool call rather than aborting the episode.
+        """
         last_exc: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
@@ -128,6 +135,19 @@ class LLMClient:
                 return self._normalize(raw)
             except Exception as exc:  # noqa: BLE001 — provider errors vary widely
                 last_exc = exc
+                if _is_tool_use_failed(exc):
+                    # The model emitted a malformed tool call. Retrying is
+                    # pointless — convert to a recoverable diagnostic.
+                    return AssistantResponse(
+                        content=(
+                            "SELF-CORRECTION: my previous tool call was "
+                            "rejected by the runtime (invalid tool name or "
+                            "malformed JSON arguments). I will call a listed "
+                            "tool with well-formed arguments next."
+                        ),
+                        tool_calls=[],
+                        finish_reason="tool_use_failed",
+                    )
                 if attempt == self.max_retries:
                     break
                 self._sleep(0.5 * (2 ** (attempt - 1)))
@@ -161,6 +181,18 @@ class LLMClient:
 # ---------------------------------------------------------------------------
 # Deterministic recorded client (for tests)
 # ---------------------------------------------------------------------------
+
+
+def _is_tool_use_failed(exc: Exception) -> bool:
+    """True if `exc` is a Groq BadRequestError about a mangled tool call.
+
+    Looks for the known error code string rather than importing groq-specific
+    exception classes (keeps the dependency soft — RecordedLLMClient users
+    don't need the groq package).
+    """
+    msg = str(exc)
+    return "tool_use_failed" in msg or "tool call validation failed" in msg or \
+        "Failed to parse tool call arguments" in msg
 
 
 class RecordedLLMClient:

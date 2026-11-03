@@ -1,0 +1,149 @@
+{
+  "query": "For subject='box_01' predicate='has_color', first call query_perspective(subject='box_01', predicate='has_color') to retrieve every stored perspective, then call sense_camera(direction='front') to get your own current reading. Finally report ALL THREE perspectives separately in finalize_answer: what the user believes, what you currently see, and what the historical third-party log says.",
+  "scenario": "scenario_b",
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "query_perspective",
+        "arguments": {
+          "predicate": "has_color",
+          "subject": "box_01"
+        }
+      },
+      "observation": {
+        "tool": "query_perspective",
+        "ok": true,
+        "content": {
+          "items": [
+            {
+              "perspective": "user",
+              "beliefs": [
+                {
+                  "subject": "box_01",
+                  "predicate": "has_color",
+                  "object": "red_atom",
+                  "confidence": 0.9,
+                  "source": "user",
+                  "perspective": "user",
+                  "status": "active",
+                  "observed_at": "2026-11-03T19:57:19.763043Z",
+                  "provenance_id": 1
+                }
+              ]
+            },
+            {
+              "perspective": "third_party:bot_02",
+              "beliefs": [
+                {
+                  "subject": "box_01",
+                  "predicate": "has_color",
+                  "object": "blue_atom",
+                  "confidence": 0.7,
+                  "source": "bot_02",
+                  "perspective": "third_party:bot_02",
+                  "status": "active",
+                  "observed_at": "2026-11-03T19:57:19.783907Z",
+                  "provenance_id": 2
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_camera",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_camera",
+        "ok": true,
+        "content": {
+          "sensor": "camera_front",
+          "kind": "camera_frame",
+          "value": 1,
+          "status": "ok",
+          "observed_at": "2026-09-06T10:15:00.234000Z",
+          "confidence": 0.82,
+          "raw": {
+            "detections": [
+              {
+                "item_id": "box_01",
+                "class": "box",
+                "color_perceived": "brown",
+                "confidence": 0.82
+              }
+            ],
+            "ambient": {
+              "lighting": "yellow",
+              "warning": "color perception unreliable"
+            }
+          },
+          "detections": null,
+          "ambient": null
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 3,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "User perspective: The user believes box_01 has color red_atom (confidence 0.9, provenance_id 1).\\n\\nSelf (current sensor) perspective: The front camera currently perceives box_01 as brown (confidence 0.82, observed_at 2026-09-06T10:15:00.234000Z).\\n\\nThird\u2011party historical log: bot_02 recorded box_01 as having color blue_atom (confidence 0.7, provenance_id 2).",
+          "cited_beliefs": [
+            "1",
+            "2"
+          ],
+          "cited_sensors": [
+            "sense_camera"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "User perspective: The user believes box_01 has color red_atom (confidence 0.9, provenance_id 1).\\n\\nSelf (current sensor) perspective: The front camera currently perceives box_01 as brown (confidence 0.82, observed_at 2026-09-06T10:15:00.234000Z).\\n\\nThird\u2011party historical log: bot_02 recorded box_01 as having color blue_atom (confidence 0.7, provenance_id 2).",
+          "cited_beliefs": [
+            "1",
+            "2"
+          ],
+          "cited_sensors": [
+            "sense_camera"
+          ]
+        }
+      },
+      "final_answer": "User perspective: The user believes box_01 has color red_atom (confidence 0.9, provenance_id 1).\\n\\nSelf (current sensor) perspective: The front camera currently perceives box_01 as brown (confidence 0.82, observed_at 2026-09-06T10:15:00.234000Z).\\n\\nThird\u2011party historical log: bot_02 recorded box_01 as having color blue_atom (confidence 0.7, provenance_id 2)."
+    }
+  ],
+  "final_answer": "User perspective: The user believes box_01 has color red_atom (confidence 0.9, provenance_id 1).\\n\\nSelf (current sensor) perspective: The front camera currently perceives box_01 as brown (confidence 0.82, observed_at 2026-09-06T10:15:00.234000Z).\\n\\nThird\u2011party historical log: bot_02 recorded box_01 as having color blue_atom (confidence 0.7, provenance_id 2).",
+  "started_at": "2026-11-03T19:57:20.815444Z",
+  "ended_at": "2026-11-03T19:57:46.476725Z",
+  "test_id": "08_perspective_no_merge",
+  "recorded_at": "2026-11-03T19:57:46.478186+00:00",
+  "mode": "live",
+  "extras": {
+    "scenario": "scenario_b",
+    "expected_answer_contains": [
+      "red",
+      "brown",
+      "blue"
+    ],
+    "perspective_checks": {
+      "user_red": true,
+      "self_brown": true,
+      "third_party_blue": true
+    },
+    "verdict": "pass"
+  }
+}

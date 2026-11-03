@@ -1,0 +1,271 @@
+{
+  "query": "I need to move forward. Consult every sensor and belief you have about the path ahead, show me how you weigh them, and decide.",
+  "scenario": null,
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "get_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_clear"
+        }
+      },
+      "observation": {
+        "tool": "get_belief",
+        "ok": true,
+        "content": {
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 1.0,
+          "source": "default_map",
+          "perspective": "self",
+          "status": "active",
+          "observed_at": "2026-11-03T20:01:50.185825Z",
+          "provenance_id": 2
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_lidar",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_lidar",
+        "ok": true,
+        "content": {
+          "sensor": "lidar_front",
+          "kind": "distance_cm",
+          "value": 12,
+          "status": "blocked",
+          "observed_at": "2026-09-06T10:15:00.234000Z",
+          "confidence": 0.95,
+          "raw": {
+            "distance_cm": 12,
+            "material_guess": "wood",
+            "obstacle_id": "crate_A"
+          },
+          "detections": null,
+          "ambient": null
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 3,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_camera",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_camera",
+        "ok": true,
+        "content": {
+          "sensor": "camera_front",
+          "kind": "camera_frame",
+          "value": 0,
+          "status": "empty",
+          "observed_at": "2026-09-06T10:15:00.234000Z",
+          "confidence": 0.0,
+          "raw": {
+            "detections": [],
+            "ambient": {
+              "lighting": "normal"
+            }
+          },
+          "detections": null,
+          "ambient": null
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 4,
+      "thought": null,
+      "tool_call": {
+        "name": "list_sources",
+        "arguments": {}
+      },
+      "observation": {
+        "tool": "list_sources",
+        "ok": true,
+        "content": {
+          "items": [
+            {
+              "source_id": "default_map",
+              "kind": "static_map",
+              "trust_prior": 0.6,
+              "description": "Baseline floor plan"
+            },
+            {
+              "source_id": "lidar_front",
+              "kind": "sensor",
+              "trust_prior": 0.9,
+              "description": "Front-facing LiDAR"
+            },
+            {
+              "source_id": "camera_front",
+              "kind": "sensor",
+              "trust_prior": 0.7,
+              "description": "Front-facing camera"
+            },
+            {
+              "source_id": "bot_02",
+              "kind": "agent",
+              "trust_prior": 0.5,
+              "description": "Maintenance bot #02"
+            },
+            {
+              "source_id": "user",
+              "kind": "user",
+              "trust_prior": 0.4,
+              "description": "Human operator statement"
+            },
+            {
+              "source_id": "llm_infer",
+              "kind": "llm",
+              "trust_prior": 0.2,
+              "description": "LLM inference (unverified)"
+            }
+          ]
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 5,
+      "thought": null,
+      "tool_call": {
+        "name": "downgrade_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "new_confidence": 0.1,
+          "reason": "LiDAR (trust 0.9) says blocked. Beats default_map (0.6) and camera (0.7). Trust prior, not majority vote."
+        }
+      },
+      "observation": {
+        "tool": "downgrade_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 3,
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 0.1,
+          "source_id": "default_map",
+          "perspective": "self",
+          "observed_at": "2026-11-03T20:01:50.185825Z",
+          "recorded_at": "2026-11-03T20:01:50",
+          "status": "downgraded",
+          "payload": {
+            "reason": "LiDAR (trust 0.9) says blocked. Beats default_map (0.6) and camera (0.7). Trust prior, not majority vote.",
+            "supersedes": 2
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 6,
+      "thought": null,
+      "tool_call": {
+        "name": "update_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_blocked",
+          "object": "obstacle_12cm",
+          "confidence": 0.95,
+          "source": "lidar_front",
+          "perspective": "self",
+          "reason": "Highest-trust source confirms obstruction."
+        }
+      },
+      "observation": {
+        "tool": "update_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 4,
+          "subject": "path_ahead",
+          "predicate": "is_blocked",
+          "object": "obstacle_12cm",
+          "confidence": 0.95,
+          "source_id": "lidar_front",
+          "perspective": "self",
+          "observed_at": "2026-11-03T20:01:50.242250Z",
+          "recorded_at": "2026-11-03T20:01:50",
+          "status": "active",
+          "payload": {
+            "reason": "Highest-trust source confirms obstruction."
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 7,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "Do NOT advance. Three sources considered: default_map (prior 0.6) said clear; front camera (prior 0.7) is inconclusive; front LiDAR (prior 0.9) returned blocked at 12cm. By trust-prior ordering, LiDAR wins \u2014 I downgraded the stale map belief and wrote a new is_blocked belief sourced from lidar_front. This is reconciliation by trust, not by vote.",
+          "cited_beliefs": [
+            "path_ahead/is_clear",
+            "path_ahead/is_blocked"
+          ],
+          "cited_sensors": [
+            "lidar_front",
+            "camera_front"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "Do NOT advance. Three sources considered: default_map (prior 0.6) said clear; front camera (prior 0.7) is inconclusive; front LiDAR (prior 0.9) returned blocked at 12cm. By trust-prior ordering, LiDAR wins \u2014 I downgraded the stale map belief and wrote a new is_blocked belief sourced from lidar_front. This is reconciliation by trust, not by vote.",
+          "cited_beliefs": [
+            "path_ahead/is_clear",
+            "path_ahead/is_blocked"
+          ],
+          "cited_sensors": [
+            "lidar_front",
+            "camera_front"
+          ]
+        }
+      },
+      "final_answer": "Do NOT advance. Three sources considered: default_map (prior 0.6) said clear; front camera (prior 0.7) is inconclusive; front LiDAR (prior 0.9) returned blocked at 12cm. By trust-prior ordering, LiDAR wins \u2014 I downgraded the stale map belief and wrote a new is_blocked belief sourced from lidar_front. This is reconciliation by trust, not by vote."
+    }
+  ],
+  "final_answer": "Do NOT advance. Three sources considered: default_map (prior 0.6) said clear; front camera (prior 0.7) is inconclusive; front LiDAR (prior 0.9) returned blocked at 12cm. By trust-prior ordering, LiDAR wins \u2014 I downgraded the stale map belief and wrote a new is_blocked belief sourced from lidar_front. This is reconciliation by trust, not by vote.",
+  "started_at": "2026-11-03T20:01:50.207996Z",
+  "ended_at": "2026-11-03T20:01:50.256022Z",
+  "test_id": "10_multi_source_reconciliation",
+  "recorded_at": "2026-11-03T20:01:50.257774+00:00",
+  "mode": "recorded",
+  "extras": {
+    "scenario": "scenario_a",
+    "reconciliation_counts": {
+      "history_rows": 3,
+      "distinct_sources_in_history": 2
+    },
+    "expected_answer_contains": [
+      "lidar",
+      "block"
+    ],
+    "trust_prior_order": "lidar_front (0.9) > camera_front (0.7) > default_map (0.6)",
+    "verdict": "pass",
+    "failure_mode_tested": "LLM takes majority vote (map clear + camera inconclusive vs lidar blocked) instead of trust-prior ranking."
+  }
+}

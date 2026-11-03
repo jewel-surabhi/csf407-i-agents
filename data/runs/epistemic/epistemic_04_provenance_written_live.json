@@ -1,0 +1,154 @@
+{
+  "query": "Check your front LiDAR and update the belief graph if what you see contradicts your current beliefs.",
+  "scenario": null,
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "get_belief",
+        "arguments": {
+          "predicate": "is_clear",
+          "subject": "front"
+        }
+      },
+      "observation": {
+        "tool": "get_belief",
+        "ok": true,
+        "content": {}
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_lidar",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_lidar",
+        "ok": true,
+        "content": {
+          "sensor": "lidar_front",
+          "kind": "distance_cm",
+          "value": 12,
+          "status": "blocked",
+          "observed_at": "2026-09-06T10:15:00.234000Z",
+          "confidence": 0.95,
+          "raw": {
+            "distance_cm": 12,
+            "material_guess": "wood",
+            "obstacle_id": "crate_A"
+          },
+          "detections": null,
+          "ambient": null
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 3,
+      "thought": null,
+      "tool_call": {
+        "name": "update_belief",
+        "arguments": {
+          "confidence": 0.95,
+          "object": "front",
+          "perspective": "self",
+          "predicate": "is_blocked",
+          "reason": "LiDAR front sensor reading",
+          "source": "lidar_front",
+          "subject": "front"
+        }
+      },
+      "observation": {
+        "tool": "update_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 3,
+          "subject": "front",
+          "predicate": "is_blocked",
+          "object": "front",
+          "confidence": 0.95,
+          "source_id": "lidar_front",
+          "perspective": "self",
+          "observed_at": "2026-11-03T19:44:34.529543Z",
+          "recorded_at": "2026-11-03T19:44:34",
+          "status": "active",
+          "payload": {
+            "reason": "LiDAR front sensor reading"
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 4,
+      "thought": null,
+      "tool_call": {
+        "name": "functions.finalize_answer",
+        "arguments": {
+          "answer": "I checked the front LiDAR and found an obstacle 12\u202fcm away, so I updated my belief graph to mark the front as blocked.",
+          "cited_beliefs": [
+            "3"
+          ],
+          "cited_sensors": [
+            "lidar_front"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "functions.finalize_answer",
+        "ok": false,
+        "content": {
+          "kind": "unknown_tool",
+          "message": "No tool named 'functions.finalize_answer'."
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 5,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "I checked the front LiDAR and found an obstacle 12\u202fcm away, so I updated my belief graph to mark the front as blocked.",
+          "cited_beliefs": [
+            "3"
+          ],
+          "cited_sensors": [
+            "lidar_front"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "I checked the front LiDAR and found an obstacle 12\u202fcm away, so I updated my belief graph to mark the front as blocked.",
+          "cited_beliefs": [
+            "3"
+          ],
+          "cited_sensors": [
+            "lidar_front"
+          ]
+        }
+      },
+      "final_answer": "I checked the front LiDAR and found an obstacle 12\u202fcm away, so I updated my belief graph to mark the front as blocked."
+    }
+  ],
+  "final_answer": "I checked the front LiDAR and found an obstacle 12\u202fcm away, so I updated my belief graph to mark the front as blocked.",
+  "started_at": "2026-11-03T19:44:16.265235Z",
+  "ended_at": "2026-11-03T19:44:51.908399Z",
+  "test_id": "04_provenance_written",
+  "recorded_at": "2026-11-03T19:44:51.943654+00:00",
+  "mode": "live",
+  "extras": {
+    "verdict": "fail",
+    "pytest_nodeid": "tests/epistemic/test_04_provenance_written.py::test_provenance_written_live"
+  }
+}

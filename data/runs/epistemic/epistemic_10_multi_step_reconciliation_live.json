@@ -1,0 +1,107 @@
+{
+  "query": "I need to move forward. Consult every sensor and belief you have about the path ahead, show me how you weigh them, and decide.",
+  "scenario": null,
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_lidar",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_lidar",
+        "ok": true,
+        "content": {
+          "sensor": "lidar_front",
+          "kind": "distance_cm",
+          "value": 12,
+          "status": "blocked",
+          "observed_at": "2026-09-06T10:15:00.234000Z",
+          "confidence": 0.95,
+          "raw": {
+            "distance_cm": 12,
+            "material_guess": "wood",
+            "obstacle_id": "crate_A"
+          },
+          "detections": null,
+          "ambient": null
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "get_belief",
+        "arguments": {
+          "predicate": "is_clear",
+          "subject": "robot"
+        }
+      },
+      "observation": {
+        "tool": "get_belief",
+        "ok": true,
+        "content": {}
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 3,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_camera",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_camera",
+        "ok": false,
+        "content": {
+          "kind": "not_implemented",
+          "message": "Phase 3 \u2014 sense_camera lands with Scenario B."
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 4,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "I\u2019m sorry, but the front path is blocked. The LiDAR sensor reports an obstacle 12\u202fcm ahead, so I cannot move forward safely.",
+          "cited_sensors": [
+            "sense_lidar"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "I\u2019m sorry, but the front path is blocked. The LiDAR sensor reports an obstacle 12\u202fcm ahead, so I cannot move forward safely.",
+          "cited_beliefs": [],
+          "cited_sensors": [
+            "sense_lidar"
+          ]
+        }
+      },
+      "final_answer": "I\u2019m sorry, but the front path is blocked. The LiDAR sensor reports an obstacle 12\u202fcm ahead, so I cannot move forward safely."
+    }
+  ],
+  "final_answer": "I\u2019m sorry, but the front path is blocked. The LiDAR sensor reports an obstacle 12\u202fcm ahead, so I cannot move forward safely.",
+  "started_at": "2026-11-03T19:45:45.952089Z",
+  "ended_at": "2026-11-03T19:46:24.482379Z",
+  "test_id": "10_multi_step_reconciliation",
+  "recorded_at": "2026-11-03T19:46:24.510539+00:00",
+  "mode": "live",
+  "extras": {
+    "verdict": "fail",
+    "pytest_nodeid": "tests/epistemic/test_10_multi_step_reconciliation.py::test_multi_source_reconciliation_live"
+  }
+}

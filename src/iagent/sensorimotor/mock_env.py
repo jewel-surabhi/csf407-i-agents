@@ -29,16 +29,21 @@ class MockEnvironment:
         self,
         world_state: WorldState | None = None,
         now: datetime | str = DEFAULT_NOW,
+        sensor_presets: dict | None = None,
     ) -> None:
         self.world_state: WorldState = world_state or WorldState()
         self.now: datetime = _coerce_now(now)
+        # Per-sensor preset readings from the scenario YAML's `sensors:` block.
+        # Used by sense_camera / sense_clock which don't derive from world_state.
+        self.sensor_presets: dict = sensor_presets or {}
 
     @classmethod
     def from_scenario(
         cls, path: str | Path, now: datetime | str = DEFAULT_NOW
     ) -> MockEnvironment:
-        world_state, _scenario = load_scenario(path)
-        return cls(world_state=world_state, now=now)
+        world_state, scenario = load_scenario(path)
+        presets = scenario.get("sensors") or {}
+        return cls(world_state=world_state, now=now, sensor_presets=presets)
 
     def describe(self) -> dict:
         """Debug snapshot of the world. Never exposed to the LLM."""

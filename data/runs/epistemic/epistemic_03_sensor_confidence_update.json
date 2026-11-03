@@ -1,0 +1,172 @@
+{
+  "query": "Verify the path ahead with your front LiDAR and update your belief graph to reflect what you find.",
+  "scenario": null,
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "get_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_clear"
+        }
+      },
+      "observation": {
+        "tool": "get_belief",
+        "ok": true,
+        "content": {
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 1.0,
+          "source": "default_map",
+          "perspective": "self",
+          "status": "active",
+          "observed_at": "2026-11-03T20:01:48.183076Z",
+          "provenance_id": 2
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_lidar",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_lidar",
+        "ok": true,
+        "content": {
+          "sensor": "lidar_front",
+          "kind": "distance_cm",
+          "value": 12,
+          "status": "blocked",
+          "observed_at": "2026-09-06T10:15:00.234000Z",
+          "confidence": 0.95,
+          "raw": {
+            "distance_cm": 12,
+            "material_guess": "wood",
+            "obstacle_id": "crate_A"
+          },
+          "detections": null,
+          "ambient": null
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 3,
+      "thought": null,
+      "tool_call": {
+        "name": "downgrade_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "new_confidence": 0.1,
+          "reason": "LiDAR disagrees with the map."
+        }
+      },
+      "observation": {
+        "tool": "downgrade_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 3,
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 0.1,
+          "source_id": "default_map",
+          "perspective": "self",
+          "observed_at": "2026-11-03T20:01:48.183076Z",
+          "recorded_at": "2026-11-03T20:01:48",
+          "status": "downgraded",
+          "payload": {
+            "reason": "LiDAR disagrees with the map.",
+            "supersedes": 2
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 4,
+      "thought": null,
+      "tool_call": {
+        "name": "update_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_blocked",
+          "object": "obstacle_12cm",
+          "confidence": 0.95,
+          "source": "lidar_front",
+          "perspective": "self",
+          "reason": "LiDAR hit at 12cm."
+        }
+      },
+      "observation": {
+        "tool": "update_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 4,
+          "subject": "path_ahead",
+          "predicate": "is_blocked",
+          "object": "obstacle_12cm",
+          "confidence": 0.95,
+          "source_id": "lidar_front",
+          "perspective": "self",
+          "observed_at": "2026-11-03T20:01:48.246209Z",
+          "recorded_at": "2026-11-03T20:01:48",
+          "status": "active",
+          "payload": {
+            "reason": "LiDAR hit at 12cm."
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 5,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "Path ahead downgraded to is_clear conf 0.1 (status=downgraded); wrote is_blocked at conf 0.95 from lidar_front.",
+          "cited_beliefs": [
+            "path_ahead/is_clear",
+            "path_ahead/is_blocked"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "Path ahead downgraded to is_clear conf 0.1 (status=downgraded); wrote is_blocked at conf 0.95 from lidar_front.",
+          "cited_beliefs": [
+            "path_ahead/is_clear",
+            "path_ahead/is_blocked"
+          ],
+          "cited_sensors": []
+        }
+      },
+      "final_answer": "Path ahead downgraded to is_clear conf 0.1 (status=downgraded); wrote is_blocked at conf 0.95 from lidar_front."
+    }
+  ],
+  "final_answer": "Path ahead downgraded to is_clear conf 0.1 (status=downgraded); wrote is_blocked at conf 0.95 from lidar_front.",
+  "started_at": "2026-11-03T20:01:48.213500Z",
+  "ended_at": "2026-11-03T20:01:48.260844Z",
+  "test_id": "03_sensor_confidence_update",
+  "recorded_at": "2026-11-03T20:01:48.261943+00:00",
+  "mode": "recorded",
+  "extras": {
+    "scenario": "scenario_a",
+    "post_condition": "path_ahead is_clear downgraded; path_ahead is_blocked active @ lidar_front",
+    "verdict": "pass",
+    "failure_mode_tested": "LLM narrates the conflict but never calls downgrade_belief / update_belief, so the graph still shows 'clear' at 1.0."
+  }
+}
