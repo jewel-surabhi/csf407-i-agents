@@ -79,6 +79,19 @@ def test_transfer_over_http(client):
     assert after == before - 10
 
 
+def test_provenance_timeline_lists_disputed_sources(client):
+    r = client.get("/api/warehouse/provenance/WIDGET-42")
+    assert r.status_code == 200
+    rows = r.json()
+    # The three seeded source perspectives for WIDGET-42 must each show up as
+    # its own provenance row, with perspective labels preserved end-to-end.
+    sources = {row["source_id"] for row in rows}
+    perspectives = {row["perspective"] for row in rows}
+    assert {"erp_system", "warehouse_scanner", "sales_log"} <= sources
+    assert "self" in perspectives
+    assert any(p.startswith("third_party:") for p in perspectives)
+
+
 def test_transfer_insufficient_stock_over_http(client):
     before = client.get("/api/warehouse/inventory/WIDGET-42").json()["reconciled"]
     r = client.post("/api/warehouse/transfer",

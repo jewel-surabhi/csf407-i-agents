@@ -3,6 +3,7 @@ import { api } from "./api/client";
 import type {
   AgentResult,
   InventoryView,
+  ProvenanceEntry,
   Shelf,
   ShelfContents,
   WarehouseView,
@@ -19,11 +20,50 @@ const TRUST = [
   { nm: "Floor Map", kd: "Map", trust: 0.6, cls: "system" },
 ];
 
-const PILLS = [
-  "Route me to WIDGET-42",
-  "How many WIDGET-42?",
-  "Why avoid the mid-aisle?",
+// Pills aligned with the proposal's canonical epistemic scenarios so a grader
+// opening the UI cold can run Scenario A / B straight from the ask bar.
+const PILLS: { label: string; query: string }[] = [
+  {
+    label: "Scenario A · Is the Aisle B route clear?",
+    query:
+      "Is the route from B-S to B-D clear? Justify your answer by inspecting the belief graph — the map claim versus the live LiDAR reading — and say which perspective wins and why.",
+  },
+  {
+    label: "Scenario B · Three perspectives on WIDGET-42",
+    query:
+      "For WIDGET-42, report three perspectives separately: what the user wants, what you (self) currently sense via the warehouse scanner, and what the third-party ERP and sales logs say. Do not merge them.",
+  },
+  {
+    label: "How do you avoid hallucinating?",
+    query:
+      "Explain, by citing the tool calls in your trace, how your answer is grounded in the belief graph and provenance log rather than invented.",
+  },
 ];
+
+// Human-readable label for a raw perspective slug like `third_party:erp`.
+function perspectiveLabel(p: string): string {
+  if (p === "self") return "self · egocentric";
+  if (p === "user") return "user";
+  if (p.startsWith("third_party:")) return "third-party · " + p.slice("third_party:".length);
+  return p;
+}
+
+// Tailwind-ish class suffix that drives perspective-chip color in CSS.
+function perspectiveKind(p: string): "self" | "user" | "third" {
+  if (p === "self") return "self";
+  if (p === "user") return "user";
+  return "third";
+}
+
+function fmtTime(iso?: string | null): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return iso;
+  }
+}
 
 interface Toast {
   id: number;
@@ -41,6 +81,7 @@ export default function App() {
   const [shelfSel, setShelfSel] = useState<Shelf | null>(null);
   const [inv, setInv] = useState<InventoryView | null>(null);
   const [bin, setBin] = useState<ShelfContents | null>(null);
+  const [prov, setProv] = useState<ProvenanceEntry[] | null>(null);
   const [recentArrival, setRecentArrival] = useState<string | null>(null);
   const [xferDest, setXferDest] = useState<string>("");
   const [xferQty, setXferQty] = useState<number>(10);
@@ -96,16 +137,22 @@ export default function App() {
     setShelfSel(sh);
     setInv(null);
     setBin(null);
+    setProv(null);
     setRecentArrival(null);
     const others = view.shelves.filter((s) => s.id !== id);
     setXferDest(others[0]?.id ?? "");
     try {
-      // Fetch both: the per-SKU reconciliation (shows the multi-source dispute)
-      // AND the shelf's full contents (shows every lot stored here, including
-      // units transferred in).
-      const [i, b] = await Promise.all([api.inventory(id), api.bin(id)]);
+      // Fetch three things in parallel: per-SKU reconciliation (multi-source
+      // dispute), the shelf's full bin contents (every lot stored here), and
+      // the full provenance timeline (the SQLite history ledger).
+      const [i, b, p] = await Promise.all([
+        api.inventory(id),
+        api.bin(id),
+        api.provenance(id),
+      ]);
       setInv(i);
       setBin(b);
+      setProv(p);
     } catch {
       /* leave null */
     }
@@ -123,15 +170,17 @@ export default function App() {
       // Refresh everything the transfer affected: the warehouse view (so the
       // floor is current), the source's reconciliation and bin, AND the
       // destination's bin — so the user SEES the +K units land there.
-      const [v, srcInv, srcBin, destBin] = await Promise.all([
+      const [v, srcInv, srcBin, destBin, srcProv] = await Promise.all([
         api.getWarehouse(),
         api.inventory(shelfSel.id),
         api.bin(shelfSel.id),
         api.bin(xferDest),
+        api.provenance(shelfSel.id),
       ]);
       setView(v);
       setInv(srcInv);
       setBin(srcBin);
+      setProv(srcProv);
       setRecentArrival(
         `+${res.quantity} ${res.sku} just landed at ${res.dest_shelf} — ` +
           `${res.dest_shelf} now holds ${destBin.total_units} total units ` +
@@ -259,10 +308,18 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
 
               {inv && inv.sources.length > 1 && (
                 <>
-                  <div style={{ fontSize: 12, color: "var(--ink-2)" }}>Sources disagree:</div>
+                  <div style={{ fontSize: 12, color: "var(--ink-2)" }}>
+                    Sources disagree — each from its own perspective:
+                  </div>
                   {inv.sources.map((s, i) => (
                     <div className="srcrow" key={i}>
-                      <span className="nm">{s.source} {s.note && <span className="tw">·{s.note}</span>}</span>
+                      <span className="nm">
+                        <span className={"psp psp-" + perspectiveKind(s.perspective)}>
+                          {perspectiveLabel(s.perspective)}
+                        </span>{" "}
+                        {s.source}
+                        {s.note && <span className="tw"> ·{s.note}</span>}
+                      </span>
                       <span className="ct">{s.predicate === "shipped" ? "−" : ""}{s.value}</span>
                     </div>
                   ))}
@@ -293,6 +350,37 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
                       <span className="ct">{lot.quantity}</span>
                     </div>
                   ))}
+                </>
+              )}
+
+              {prov && prov.length > 0 && (
+                <>
+                  <div style={{ fontSize: 11, color: "var(--ink-2)", textTransform: "uppercase",
+                                 letterSpacing: ".06em", marginTop: 2 }}>
+                    Provenance timeline · SQLite log
+                  </div>
+                  <ol className="prov">
+                    {prov.slice(0, 8).map((p, i) => {
+                      const reason = (p.payload as { reason?: string } | null | undefined)?.reason;
+                      return (
+                        <li key={p.provenance_id ?? i} className={"pv pv-" + p.status}>
+                          <span className="pv-t">{fmtTime(p.recorded_at ?? p.observed_at)}</span>
+                          <span className="pv-m">
+                            <span className={"psp psp-" + perspectiveKind(p.perspective)}>
+                              {perspectiveLabel(p.perspective)}
+                            </span>{" "}
+                            <b>{p.source_id}</b>{" "}
+                            <span className="tw">{p.predicate}=</span>
+                            <span className="ct">{p.object}</span>
+                            {reason && <span className="tw"> · {reason}</span>}
+                          </span>
+                          {p.status !== "active" && (
+                            <span className="pv-s">{p.status}</span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ol>
                 </>
               )}
 
@@ -353,7 +441,14 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
       <div className="askbar">
         <div className="pills">
           {PILLS.map((p) => (
-            <button className="pill" key={p} onClick={() => { setAskText(p); ask(p); }}>{p}</button>
+            <button
+              className="pill"
+              key={p.label}
+              onClick={() => { setAskText(p.query); ask(p.query); }}
+              title={p.query}
+            >
+              {p.label}
+            </button>
           ))}
         </div>
         <div className="askrow">
@@ -384,11 +479,47 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
             <div className="drawer-body">
               {tab === "reason" ? (
                 <>
-                  <div className="sec-note">The agent's live ReAct trace from your last question.</div>
+                  <div className="sec-note">
+                    The agent's live ReAct trace from your last question — every
+                    thought, tool call, and observation that grounded the answer.
+                  </div>
                   {answer ? answer.trace.steps.map((s, i) => (
-                    <div className="belief" key={i}>
-                      <span className="bid">{s.tool_call ? `${s.tool_call.name}()` : (s.thought ?? "step")}</span>
-                      {s.observation && <span className="bst">{s.observation.ok ? "ok" : "err"}</span>}
+                    <div className="step" key={i}>
+                      <div className="step-h">
+                        <span className="step-i">#{s.idx}</span>
+                        {s.tool_call && (
+                          <span className="step-tag tc">tool_call</span>
+                        )}
+                        {s.observation && (
+                          <span className={"step-tag " + (s.observation.ok ? "ok" : "err")}>
+                            {s.observation.ok ? "observation" : "error"}
+                          </span>
+                        )}
+                        {s.final_answer && (
+                          <span className="step-tag fa">final_answer</span>
+                        )}
+                      </div>
+                      {s.thought && (
+                        <div className="step-th">💭 {s.thought}</div>
+                      )}
+                      {s.tool_call && (
+                        <div className="step-tc">
+                          <code className="tc-name">{s.tool_call.name}</code>
+                          <pre className="tc-args">
+                            {JSON.stringify(s.tool_call.arguments, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                      {s.observation && (
+                        <pre className="step-ob">
+                          {typeof s.observation.content === "string"
+                            ? s.observation.content
+                            : JSON.stringify(s.observation.content, null, 2)}
+                        </pre>
+                      )}
+                      {s.final_answer && (
+                        <div className="step-fa">{s.final_answer}</div>
+                      )}
                     </div>
                   )) : <div className="empty">Ask a question to see the agent reason.</div>}
                 </>

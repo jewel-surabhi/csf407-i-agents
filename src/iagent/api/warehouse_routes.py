@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from iagent.declarative.api import KnowledgeAPI
 from iagent.declarative.belief_graph import BeliefGraph
+from iagent.declarative.models import ProvenanceEntry
 from iagent.declarative.provenance import ProvenanceStore
 from iagent.declarative.seeding import seed_sources
 from iagent.warehouse.models import (
@@ -147,6 +148,17 @@ def get_inventory(sku: str, wh: WH) -> InventoryView:
 def get_bin(shelf_id: str, wh: WH) -> ShelfContents:
     """List every lot currently stored at a shelf (bin), including transferred-in."""
     return shelf_contents(wh.knowledge, wh.topo, shelf_id)
+
+
+@router.get("/provenance/{sku}", response_model=list[ProvenanceEntry])
+def get_provenance(sku: str, wh: WH, limit: int = 20) -> list[ProvenanceEntry]:
+    """Full provenance timeline for a SKU — every claim, by every source, over time.
+
+    This is the SQLite provenance log surfaced for the UI. Each entry shows WHO
+    said WHAT, from WHICH PERSPECTIVE, with WHAT CONFIDENCE, and WHEN. Lets the
+    user see the historical ledger behind the current reconciled view.
+    """
+    return wh.knowledge.query_provenance(sku, limit=limit)
 
 
 @router.post("/transfer", response_model=TransferResult)

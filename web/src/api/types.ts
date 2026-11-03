@@ -99,6 +99,21 @@ export interface ShelfContents {
   total_units: number;
 }
 
+// Mirrors declarative.ProvenanceEntry — one row in the SQLite history log.
+export interface ProvenanceEntry {
+  provenance_id?: number | null;
+  subject: string;
+  predicate: string;
+  object: string;
+  confidence: number;
+  source_id: string;
+  perspective: string;
+  observed_at: string;
+  recorded_at?: string | null;
+  status: "active" | "downgraded" | "retracted";
+  payload?: Record<string, unknown> | null;
+}
+
 // /api/query (the live agent)
 export interface TraceStep {
   idx: number;
