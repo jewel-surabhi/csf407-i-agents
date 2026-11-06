@@ -326,15 +326,26 @@ def _env_int(name: str) -> int | None:
 
 
 def _is_tool_use_failed(exc: Exception) -> bool:
-    """True if `exc` is a Groq BadRequestError about a mangled tool call.
+    """True if `exc` is a Groq BadRequestError about a mangled generation.
 
-    Looks for the known error code string rather than importing groq-specific
+    Covers the three known small-model failure modes Groq rejects with 400:
+      * `tool_use_failed`   — invented tool name or malformed JSON args
+      * `tool call validation failed` — same family, different wording
+      * `Failed to parse tool call arguments` — parse-level reject
+      * `output_parse_failed`   — model emitted free text instead of a tool
+                                  call when tool_choice="auto" required one
+
+    Looks for the known error-code strings rather than importing groq's
     exception classes (keeps the dependency soft — RecordedLLMClient users
     don't need the groq package).
     """
     msg = str(exc)
-    return "tool_use_failed" in msg or "tool call validation failed" in msg or \
-        "Failed to parse tool call arguments" in msg
+    return (
+        "tool_use_failed" in msg
+        or "tool call validation failed" in msg
+        or "Failed to parse tool call arguments" in msg
+        or "output_parse_failed" in msg
+    )
 
 
 class RecordedLLMClient:

@@ -24,7 +24,7 @@
           "source": "default_map",
           "perspective": "self",
           "status": "active",
-          "observed_at": "2026-11-03T20:01:47.595118Z",
+          "observed_at": "2026-11-06T13:27:05.835049Z",
           "provenance_id": 1
         }
       },
@@ -57,10 +57,10 @@
     }
   ],
   "final_answer": "I am located at room_101. This is a self-perspective belief sourced from the default_map at confidence 1.0.",
-  "started_at": "2026-11-03T20:01:47.629803Z",
-  "ended_at": "2026-11-03T20:01:47.630276Z",
+  "started_at": "2026-11-06T13:27:05.866890Z",
+  "ended_at": "2026-11-06T13:27:05.867662Z",
   "test_id": "01_grounded_query",
-  "recorded_at": "2026-11-03T20:01:47.631317+00:00",
+  "recorded_at": "2026-11-06T13:27:05.868750+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_a",

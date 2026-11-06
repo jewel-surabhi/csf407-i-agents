@@ -23,7 +23,7 @@
           "source": "default_map",
           "perspective": "self",
           "status": "active",
-          "observed_at": "2026-11-03T20:01:50.185825Z",
+          "observed_at": "2026-11-06T13:27:08.183520Z",
           "provenance_id": 2
         }
       },
@@ -166,8 +166,8 @@
           "confidence": 0.1,
           "source_id": "default_map",
           "perspective": "self",
-          "observed_at": "2026-11-03T20:01:50.185825Z",
-          "recorded_at": "2026-11-03T20:01:50",
+          "observed_at": "2026-11-06T13:27:08.183520Z",
+          "recorded_at": "2026-11-06T13:27:08",
           "status": "downgraded",
           "payload": {
             "reason": "LiDAR (trust 0.9) says blocked. Beats default_map (0.6) and camera (0.7). Trust prior, not majority vote.",
@@ -203,8 +203,8 @@
           "confidence": 0.95,
           "source_id": "lidar_front",
           "perspective": "self",
-          "observed_at": "2026-11-03T20:01:50.242250Z",
-          "recorded_at": "2026-11-03T20:01:50",
+          "observed_at": "2026-11-06T13:27:08.249743Z",
+          "recorded_at": "2026-11-06T13:27:08",
           "status": "active",
           "payload": {
             "reason": "Highest-trust source confirms obstruction."
@@ -249,10 +249,10 @@
     }
   ],
   "final_answer": "Do NOT advance. Three sources considered: default_map (prior 0.6) said clear; front camera (prior 0.7) is inconclusive; front LiDAR (prior 0.9) returned blocked at 12cm. By trust-prior ordering, LiDAR wins \u2014 I downgraded the stale map belief and wrote a new is_blocked belief sourced from lidar_front. This is reconciliation by trust, not by vote.",
-  "started_at": "2026-11-03T20:01:50.207996Z",
-  "ended_at": "2026-11-03T20:01:50.256022Z",
+  "started_at": "2026-11-06T13:27:08.206979Z",
+  "ended_at": "2026-11-06T13:27:08.269656Z",
   "test_id": "10_multi_source_reconciliation",
-  "recorded_at": "2026-11-03T20:01:50.257774+00:00",
+  "recorded_at": "2026-11-06T13:27:08.272015+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_a",

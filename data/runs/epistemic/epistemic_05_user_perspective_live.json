@@ -28,7 +28,7 @@
                   "source": "user",
                   "perspective": "user",
                   "status": "active",
-                  "observed_at": "2026-11-03T19:56:28.079764Z",
+                  "observed_at": "2026-11-06T13:19:27.231701Z",
                   "provenance_id": 1
                 }
               ]
@@ -44,7 +44,7 @@
                   "source": "bot_02",
                   "perspective": "third_party:bot_02",
                   "status": "active",
-                  "observed_at": "2026-11-03T19:56:28.094217Z",
+                  "observed_at": "2026-11-06T13:19:27.245218Z",
                   "provenance_id": 2
                 }
               ]
@@ -81,10 +81,10 @@
     }
   ],
   "final_answer": "The user believes that box_01 is red (has_color red_atom).",
-  "started_at": "2026-11-03T19:56:29.307407Z",
-  "ended_at": "2026-11-03T19:56:57.633975Z",
+  "started_at": "2026-11-06T13:19:28.421686Z",
+  "ended_at": "2026-11-06T13:19:58.055266Z",
   "test_id": "05_user_perspective",
-  "recorded_at": "2026-11-03T19:56:57.635392+00:00",
+  "recorded_at": "2026-11-06T13:19:58.056520+00:00",
   "mode": "live",
   "extras": {
     "scenario": "scenario_b",

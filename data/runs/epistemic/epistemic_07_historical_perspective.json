@@ -28,7 +28,7 @@
                   "source": "user",
                   "perspective": "user",
                   "status": "active",
-                  "observed_at": "2026-11-03T20:01:49.390543Z",
+                  "observed_at": "2026-11-06T13:27:07.388099Z",
                   "provenance_id": 1
                 }
               ]
@@ -44,7 +44,7 @@
                   "source": "bot_02",
                   "perspective": "third_party:bot_02",
                   "status": "active",
-                  "observed_at": "2026-11-03T20:01:49.405969Z",
+                  "observed_at": "2026-11-06T13:27:07.405136Z",
                   "provenance_id": 2
                 }
               ]
@@ -78,8 +78,8 @@
               "confidence": 0.7,
               "source_id": "bot_02",
               "perspective": "third_party:bot_02",
-              "observed_at": "2026-11-03T20:01:49.405969Z",
-              "recorded_at": "2026-11-03T20:01:49",
+              "observed_at": "2026-11-06T13:27:07.405136Z",
+              "recorded_at": "2026-11-06T13:27:07",
               "status": "active",
               "payload": {
                 "reason": "scenario seed"
@@ -93,8 +93,8 @@
               "confidence": 0.9,
               "source_id": "user",
               "perspective": "user",
-              "observed_at": "2026-11-03T20:01:49.390543Z",
-              "recorded_at": "2026-11-03T20:01:49",
+              "observed_at": "2026-11-06T13:27:07.388099Z",
+              "recorded_at": "2026-11-06T13:27:07",
               "status": "active",
               "payload": {
                 "reason": "scenario seed"
@@ -132,10 +132,10 @@
     }
   ],
   "final_answer": "The historical record (third_party:bot_02 perspective) shows box_01 as blue_atom at confidence 0.7, logged by bot_02. This is a third-party log entry \u2014 not my own observation.",
-  "started_at": "2026-11-03T20:01:49.427603Z",
-  "ended_at": "2026-11-03T20:01:49.428992Z",
+  "started_at": "2026-11-06T13:27:07.428055Z",
+  "ended_at": "2026-11-06T13:27:07.430238Z",
   "test_id": "07_historical_perspective",
-  "recorded_at": "2026-11-03T20:01:49.429867+00:00",
+  "recorded_at": "2026-11-06T13:27:07.431421+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_b",

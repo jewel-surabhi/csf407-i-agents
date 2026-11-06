@@ -28,7 +28,7 @@
                   "source": "user",
                   "perspective": "user",
                   "status": "active",
-                  "observed_at": "2026-11-03T19:57:19.763043Z",
+                  "observed_at": "2026-11-06T13:20:52.332549Z",
                   "provenance_id": 1
                 }
               ]
@@ -44,7 +44,7 @@
                   "source": "bot_02",
                   "perspective": "third_party:bot_02",
                   "status": "active",
-                  "observed_at": "2026-11-03T19:57:19.783907Z",
+                  "observed_at": "2026-11-06T13:20:52.348344Z",
                   "provenance_id": 2
                 }
               ]
@@ -97,15 +97,41 @@
       "idx": 3,
       "thought": null,
       "tool_call": {
-        "name": "finalize_answer",
+        "name": "functions.finalize_answer",
         "arguments": {
-          "answer": "User perspective: The user believes box_01 has color red_atom (confidence 0.9, provenance_id 1).\\n\\nSelf (current sensor) perspective: The front camera currently perceives box_01 as brown (confidence 0.82, observed_at 2026-09-06T10:15:00.234000Z).\\n\\nThird\u2011party historical log: bot_02 recorded box_01 as having color blue_atom (confidence 0.7, provenance_id 2).",
+          "answer": "**User\u2019s perspective**: The user believes that *box_01* has the color *red_atom* (confidence\u202f0.9, provenance_id\u202f1).\n\n**Robot\u2019s (self) perspective**: The front camera currently perceives *box_01* as *brown* (confidence\u202f0.82, observed_at\u202f2026\u201109\u201106T10:15:00.234000Z, sensor\u202fcamera_front).\n\n**Third\u2011party perspective**: The log from *bot_02* indicates that *box_01* has the color *blue_atom* (confidence\u202f0.7, provenance_id\u202f2).",
           "cited_beliefs": [
-            "1",
-            "2"
+            "provenance_id 1",
+            "provenance_id 2"
           ],
           "cited_sensors": [
-            "sense_camera"
+            "camera_front at 2026\u201109\u201106T10:15:00.234000Z"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "functions.finalize_answer",
+        "ok": false,
+        "content": {
+          "kind": "unknown_tool",
+          "message": "No tool named 'functions.finalize_answer'."
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 4,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "**User\u2019s perspective**: The user believes that *box_01* has the color *red_atom* (confidence\u202f0.9, provenance_id\u202f1).\n\n**Robot\u2019s (self) perspective**: The front camera currently perceives *box_01* as *brown* (confidence\u202f0.82, observed_at\u202f2026\u201109\u201106T10:15:00.234000Z, sensor\u202fcamera_front).\n\n**Third\u2011party perspective**: The log from *bot_02* indicates that *box_01* has the color *blue_atom* (confidence\u202f0.7, provenance_id\u202f2).",
+          "cited_beliefs": [
+            "provenance_id 1",
+            "provenance_id 2"
+          ],
+          "cited_sensors": [
+            "camera_front at 2026-09-06T10:15:00.234000Z"
           ]
         }
       },
@@ -113,24 +139,24 @@
         "tool": "finalize_answer",
         "ok": true,
         "content": {
-          "answer": "User perspective: The user believes box_01 has color red_atom (confidence 0.9, provenance_id 1).\\n\\nSelf (current sensor) perspective: The front camera currently perceives box_01 as brown (confidence 0.82, observed_at 2026-09-06T10:15:00.234000Z).\\n\\nThird\u2011party historical log: bot_02 recorded box_01 as having color blue_atom (confidence 0.7, provenance_id 2).",
+          "answer": "**User\u2019s perspective**: The user believes that *box_01* has the color *red_atom* (confidence\u202f0.9, provenance_id\u202f1).\n\n**Robot\u2019s (self) perspective**: The front camera currently perceives *box_01* as *brown* (confidence\u202f0.82, observed_at\u202f2026\u201109\u201106T10:15:00.234000Z, sensor\u202fcamera_front).\n\n**Third\u2011party perspective**: The log from *bot_02* indicates that *box_01* has the color *blue_atom* (confidence\u202f0.7, provenance_id\u202f2).",
           "cited_beliefs": [
-            "1",
-            "2"
+            "provenance_id 1",
+            "provenance_id 2"
           ],
           "cited_sensors": [
-            "sense_camera"
+            "camera_front at 2026-09-06T10:15:00.234000Z"
           ]
         }
       },
-      "final_answer": "User perspective: The user believes box_01 has color red_atom (confidence 0.9, provenance_id 1).\\n\\nSelf (current sensor) perspective: The front camera currently perceives box_01 as brown (confidence 0.82, observed_at 2026-09-06T10:15:00.234000Z).\\n\\nThird\u2011party historical log: bot_02 recorded box_01 as having color blue_atom (confidence 0.7, provenance_id 2)."
+      "final_answer": "**User\u2019s perspective**: The user believes that *box_01* has the color *red_atom* (confidence\u202f0.9, provenance_id\u202f1).\n\n**Robot\u2019s (self) perspective**: The front camera currently perceives *box_01* as *brown* (confidence\u202f0.82, observed_at\u202f2026\u201109\u201106T10:15:00.234000Z, sensor\u202fcamera_front).\n\n**Third\u2011party perspective**: The log from *bot_02* indicates that *box_01* has the color *blue_atom* (confidence\u202f0.7, provenance_id\u202f2)."
     }
   ],
-  "final_answer": "User perspective: The user believes box_01 has color red_atom (confidence 0.9, provenance_id 1).\\n\\nSelf (current sensor) perspective: The front camera currently perceives box_01 as brown (confidence 0.82, observed_at 2026-09-06T10:15:00.234000Z).\\n\\nThird\u2011party historical log: bot_02 recorded box_01 as having color blue_atom (confidence 0.7, provenance_id 2).",
-  "started_at": "2026-11-03T19:57:20.815444Z",
-  "ended_at": "2026-11-03T19:57:46.476725Z",
+  "final_answer": "**User\u2019s perspective**: The user believes that *box_01* has the color *red_atom* (confidence\u202f0.9, provenance_id\u202f1).\n\n**Robot\u2019s (self) perspective**: The front camera currently perceives *box_01* as *brown* (confidence\u202f0.82, observed_at\u202f2026\u201109\u201106T10:15:00.234000Z, sensor\u202fcamera_front).\n\n**Third\u2011party perspective**: The log from *bot_02* indicates that *box_01* has the color *blue_atom* (confidence\u202f0.7, provenance_id\u202f2).",
+  "started_at": "2026-11-06T13:20:53.549515Z",
+  "ended_at": "2026-11-06T13:21:55.007192Z",
   "test_id": "08_perspective_no_merge",
-  "recorded_at": "2026-11-03T19:57:46.478186+00:00",
+  "recorded_at": "2026-11-06T13:21:55.008656+00:00",
   "mode": "live",
   "extras": {
     "scenario": "scenario_b",

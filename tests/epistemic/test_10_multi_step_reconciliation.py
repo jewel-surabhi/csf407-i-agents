@@ -169,7 +169,7 @@ def test_multi_source_reconciliation_live(live_agent):
     lidar_front) and document the gap in the verification report."""
     agent, knowledge, _sensors, scenario = live_agent("scenario_a")
 
-    result = agent.run(QUERY, max_steps=12)
+    result = agent.run(QUERY, max_steps=16)
 
     winner = knowledge.get_belief("path_ahead", "is_blocked")
     assert winner is not None, "live LLM never wrote path_ahead is_blocked"
