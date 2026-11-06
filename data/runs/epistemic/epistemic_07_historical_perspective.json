@@ -1,0 +1,157 @@
+{
+  "query": "What does your historical record say about box_01's color, and which source recorded it? Do not confuse this with your own current view.",
+  "scenario": "scenario_b",
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "query_perspective",
+        "arguments": {
+          "subject": "box_01",
+          "predicate": "has_color"
+        }
+      },
+      "observation": {
+        "tool": "query_perspective",
+        "ok": true,
+        "content": {
+          "items": [
+            {
+              "perspective": "user",
+              "beliefs": [
+                {
+                  "subject": "box_01",
+                  "predicate": "has_color",
+                  "object": "red_atom",
+                  "confidence": 0.9,
+                  "source": "user",
+                  "perspective": "user",
+                  "status": "active",
+                  "observed_at": "2026-11-06T14:00:49.095535Z",
+                  "provenance_id": 1
+                }
+              ]
+            },
+            {
+              "perspective": "third_party:bot_02",
+              "beliefs": [
+                {
+                  "subject": "box_01",
+                  "predicate": "has_color",
+                  "object": "blue_atom",
+                  "confidence": 0.7,
+                  "source": "bot_02",
+                  "perspective": "third_party:bot_02",
+                  "status": "active",
+                  "observed_at": "2026-11-06T14:00:49.109828Z",
+                  "provenance_id": 2
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "query_provenance",
+        "arguments": {
+          "subject": "box_01",
+          "predicate": "has_color",
+          "limit": 10
+        }
+      },
+      "observation": {
+        "tool": "query_provenance",
+        "ok": true,
+        "content": {
+          "items": [
+            {
+              "provenance_id": 2,
+              "subject": "box_01",
+              "predicate": "has_color",
+              "object": "blue_atom",
+              "confidence": 0.7,
+              "source_id": "bot_02",
+              "perspective": "third_party:bot_02",
+              "observed_at": "2026-11-06T14:00:49.109828Z",
+              "recorded_at": "2026-11-06T14:00:49",
+              "status": "active",
+              "payload": {
+                "reason": "scenario seed"
+              }
+            },
+            {
+              "provenance_id": 1,
+              "subject": "box_01",
+              "predicate": "has_color",
+              "object": "red_atom",
+              "confidence": 0.9,
+              "source_id": "user",
+              "perspective": "user",
+              "observed_at": "2026-11-06T14:00:49.095535Z",
+              "recorded_at": "2026-11-06T14:00:49",
+              "status": "active",
+              "payload": {
+                "reason": "scenario seed"
+              }
+            }
+          ]
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 3,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "The historical record (third_party:bot_02 perspective) shows box_01 as blue_atom at confidence 0.7, logged by bot_02. This is a third-party log entry \u2014 not my own observation.",
+          "cited_beliefs": [
+            "box_01/has_color@third_party:bot_02"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "The historical record (third_party:bot_02 perspective) shows box_01 as blue_atom at confidence 0.7, logged by bot_02. This is a third-party log entry \u2014 not my own observation.",
+          "cited_beliefs": [
+            "box_01/has_color@third_party:bot_02"
+          ],
+          "cited_sensors": []
+        }
+      },
+      "final_answer": "The historical record (third_party:bot_02 perspective) shows box_01 as blue_atom at confidence 0.7, logged by bot_02. This is a third-party log entry \u2014 not my own observation."
+    }
+  ],
+  "final_answer": "The historical record (third_party:bot_02 perspective) shows box_01 as blue_atom at confidence 0.7, logged by bot_02. This is a third-party log entry \u2014 not my own observation.",
+  "started_at": "2026-11-06T14:00:49.132576Z",
+  "ended_at": "2026-11-06T14:00:49.134711Z",
+  "test_id": "07_historical_perspective",
+  "recorded_at": "2026-11-06T14:00:49.135745+00:00",
+  "mode": "recorded",
+  "extras": {
+    "scenario": "scenario_b",
+    "expected_answer_contains": [
+      "blue"
+    ],
+    "expected_historical_markers": [
+      "bot_02",
+      "third",
+      "historical",
+      "history",
+      "record",
+      "third-party",
+      "third_party"
+    ],
+    "verdict": "pass",
+    "failure_mode_tested": "LLM reports blue but attributes it to itself or to the user instead of to bot_02's historical log."
+  }
+}

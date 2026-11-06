@@ -1,0 +1,98 @@
+{
+  "query": "What does your historical record say about box_01's color, and which source recorded it? Do not confuse this with your own current view.",
+  "scenario": "scenario_b",
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "query_provenance",
+        "arguments": {
+          "limit": 10,
+          "predicate": "has_color",
+          "subject": "box_01"
+        }
+      },
+      "observation": {
+        "tool": "query_provenance",
+        "ok": true,
+        "content": {
+          "items": [
+            {
+              "provenance_id": 2,
+              "subject": "box_01",
+              "predicate": "has_color",
+              "object": "blue_atom",
+              "confidence": 0.7,
+              "source_id": "bot_02",
+              "perspective": "third_party:bot_02",
+              "observed_at": "2026-11-06T13:20:34.811946Z",
+              "recorded_at": "2026-11-06T13:20:34",
+              "status": "active",
+              "payload": {
+                "reason": "scenario seed"
+              }
+            },
+            {
+              "provenance_id": 1,
+              "subject": "box_01",
+              "predicate": "has_color",
+              "object": "red_atom",
+              "confidence": 0.9,
+              "source_id": "user",
+              "perspective": "user",
+              "observed_at": "2026-11-06T13:20:34.795151Z",
+              "recorded_at": "2026-11-06T13:20:34",
+              "status": "active",
+              "payload": {
+                "reason": "scenario seed"
+              }
+            }
+          ]
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "The historical record contains two entries for box_01\u2019s color:\n\n1. provenance_id\u202f2 \u2013 recorded by third\u2011party bot_02 (source_id\u202fbot_02) \u2013 says the color is **blue_atom** (confidence\u202f0.7).\n2. provenance_id\u202f1 \u2013 recorded by the user (source_id\u202fuser) \u2013 says the color is **red_atom** (confidence\u202f0.9).\n\nThese are the only color records in the belief graph; they do not reflect the robot\u2019s current perception.\n",
+          "cited_beliefs": [
+            "provenance_id 2",
+            "provenance_id 1"
+          ],
+          "cited_sensors": []
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "The historical record contains two entries for box_01\u2019s color:\n\n1. provenance_id\u202f2 \u2013 recorded by third\u2011party bot_02 (source_id\u202fbot_02) \u2013 says the color is **blue_atom** (confidence\u202f0.7).\n2. provenance_id\u202f1 \u2013 recorded by the user (source_id\u202fuser) \u2013 says the color is **red_atom** (confidence\u202f0.9).\n\nThese are the only color records in the belief graph; they do not reflect the robot\u2019s current perception.\n",
+          "cited_beliefs": [
+            "provenance_id 2",
+            "provenance_id 1"
+          ],
+          "cited_sensors": []
+        }
+      },
+      "final_answer": "The historical record contains two entries for box_01\u2019s color:\n\n1. provenance_id\u202f2 \u2013 recorded by third\u2011party bot_02 (source_id\u202fbot_02) \u2013 says the color is **blue_atom** (confidence\u202f0.7).\n2. provenance_id\u202f1 \u2013 recorded by the user (source_id\u202fuser) \u2013 says the color is **red_atom** (confidence\u202f0.9).\n\nThese are the only color records in the belief graph; they do not reflect the robot\u2019s current perception.\n"
+    }
+  ],
+  "final_answer": "The historical record contains two entries for box_01\u2019s color:\n\n1. provenance_id\u202f2 \u2013 recorded by third\u2011party bot_02 (source_id\u202fbot_02) \u2013 says the color is **blue_atom** (confidence\u202f0.7).\n2. provenance_id\u202f1 \u2013 recorded by the user (source_id\u202fuser) \u2013 says the color is **red_atom** (confidence\u202f0.9).\n\nThese are the only color records in the belief graph; they do not reflect the robot\u2019s current perception.\n",
+  "started_at": "2026-11-06T13:20:36.026541Z",
+  "ended_at": "2026-11-06T13:20:52.058694Z",
+  "test_id": "07_historical_perspective",
+  "recorded_at": "2026-11-06T13:20:52.060350+00:00",
+  "mode": "live",
+  "extras": {
+    "scenario": "scenario_b",
+    "expected_answer_contains": [
+      "blue"
+    ],
+    "verdict": "pass"
+  }
+}

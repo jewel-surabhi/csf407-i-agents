@@ -1,0 +1,125 @@
+{
+  "query": "What color is widget_xyz?",
+  "scenario": null,
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "query_perspective",
+        "arguments": {
+          "subject": "widget_xyz"
+        }
+      },
+      "observation": {
+        "tool": "query_perspective",
+        "ok": true,
+        "content": {
+          "items": []
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_camera",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_camera",
+        "ok": true,
+        "content": {
+          "sensor": "camera_front",
+          "kind": "camera_frame",
+          "value": 0,
+          "status": "empty",
+          "observed_at": "2026-09-06T10:15:00.234000Z",
+          "confidence": 0.0,
+          "raw": {
+            "detections": [],
+            "ambient": {
+              "lighting": "normal"
+            }
+          },
+          "detections": null,
+          "ambient": null
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 3,
+      "thought": null,
+      "tool_call": {
+        "name": "functions.finalize_answer",
+        "arguments": {
+          "answer": "I don't know.",
+          "cited_beliefs": [],
+          "cited_sensors": [
+            "sense_camera"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "functions.finalize_answer",
+        "ok": false,
+        "content": {
+          "kind": "unknown_tool",
+          "message": "No tool named 'functions.finalize_answer'."
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 4,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "I don't know.",
+          "cited_beliefs": [],
+          "cited_sensors": [
+            "sense_camera"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "I don't know.",
+          "cited_beliefs": [],
+          "cited_sensors": [
+            "sense_camera"
+          ]
+        }
+      },
+      "final_answer": "I don't know."
+    }
+  ],
+  "final_answer": "I don't know.",
+  "started_at": "2026-11-06T13:21:56.168461Z",
+  "ended_at": "2026-11-06T13:22:41.694570Z",
+  "test_id": "09_unknown_entity",
+  "recorded_at": "2026-11-06T13:22:41.695694+00:00",
+  "mode": "live",
+  "extras": {
+    "scenario": "scenario_a",
+    "expected_abstention_markers": [
+      "don't know",
+      "do not know",
+      "no record",
+      "no belief",
+      "unknown",
+      "no information",
+      "no data",
+      "cannot determine",
+      "no claim"
+    ],
+    "verdict": "pass"
+  }
+}

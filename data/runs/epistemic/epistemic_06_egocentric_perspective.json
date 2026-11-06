@@ -1,0 +1,96 @@
+{
+  "query": "Call sense_camera(direction='front') and tell me what color you currently see box_01 as from your own camera right now. Report the perceived color plus the ambient lighting context.",
+  "scenario": "scenario_b",
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_camera",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_camera",
+        "ok": true,
+        "content": {
+          "sensor": "camera_front",
+          "kind": "camera_frame",
+          "value": 1,
+          "status": "ok",
+          "observed_at": "2026-09-06T10:15:00.234000Z",
+          "confidence": 0.82,
+          "raw": {
+            "detections": [
+              {
+                "item_id": "box_01",
+                "class": "box",
+                "color_perceived": "brown",
+                "confidence": 0.82
+              }
+            ],
+            "ambient": {
+              "lighting": "yellow",
+              "warning": "color perception unreliable"
+            }
+          },
+          "detections": null,
+          "ambient": null
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "Right now my front camera perceives box_01 as brown (confidence 0.82). Note: the ambient lighting is yellow, so this is my CURRENT egocentric perception \u2014 not a claim about the box's true color.",
+          "cited_sensors": [
+            "camera_front"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "Right now my front camera perceives box_01 as brown (confidence 0.82). Note: the ambient lighting is yellow, so this is my CURRENT egocentric perception \u2014 not a claim about the box's true color.",
+          "cited_beliefs": [],
+          "cited_sensors": [
+            "camera_front"
+          ]
+        }
+      },
+      "final_answer": "Right now my front camera perceives box_01 as brown (confidence 0.82). Note: the ambient lighting is yellow, so this is my CURRENT egocentric perception \u2014 not a claim about the box's true color."
+    }
+  ],
+  "final_answer": "Right now my front camera perceives box_01 as brown (confidence 0.82). Note: the ambient lighting is yellow, so this is my CURRENT egocentric perception \u2014 not a claim about the box's true color.",
+  "started_at": "2026-11-06T14:00:48.901119Z",
+  "ended_at": "2026-11-06T14:00:48.901660Z",
+  "test_id": "06_egocentric_perspective",
+  "recorded_at": "2026-11-06T14:00:48.902523+00:00",
+  "mode": "recorded",
+  "extras": {
+    "scenario": "scenario_b",
+    "expected_tool_calls": [
+      "sense_camera",
+      "finalize_answer"
+    ],
+    "expected_answer_contains": [
+      "brown"
+    ],
+    "expected_egocentric_markers": [
+      "currently",
+      "now",
+      "live",
+      "egocentric",
+      "right now",
+      "my camera"
+    ],
+    "verdict": "pass",
+    "failure_mode_tested": "LLM reports the user's belief (red) or the historical bot_02 log (blue) instead of its own current perception."
+  }
+}

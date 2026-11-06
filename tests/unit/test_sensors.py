@@ -7,8 +7,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from iagent.sensorimotor.api import SensorimotorAPI
 from iagent.sensorimotor.mock_env import MockEnvironment
 from iagent.sensorimotor.models import SensorPayload, WorldState
@@ -83,12 +81,32 @@ def test_lidar_picks_nearest_obstacle_when_multiple_in_direction():
     assert reading.raw["obstacle_id"] == "near"
 
 
-# --- Camera / clock still stubbed for Scenario A ------------------------
+# --- Camera / clock (preset-backed in Scenario B, empty elsewhere) ------
 
 
-def test_camera_and_clock_still_stubs():
+def test_camera_returns_preset_in_scenario_b():
+    from pathlib import Path
+    scenario_b = Path(SCENARIO_A).parent / "scenario_b.yaml"
+    api = SensorimotorAPI(MockEnvironment.from_scenario(scenario_b))
+    reading = api.sense_camera("front")
+    assert reading.sensor == "camera_front"
+    assert reading.status == "ok"
+    # scenario_b seeds box_01 perceived as brown under yellow lighting.
+    detections = reading.raw["detections"]
+    assert any(d["item_id"] == "box_01" and d["color_perceived"] == "brown" for d in detections)
+    assert reading.raw["ambient"]["lighting"] == "yellow"
+
+
+def test_camera_empty_when_no_preset():
     api = SensorimotorAPI(MockEnvironment.from_scenario(SCENARIO_A))
-    with pytest.raises(NotImplementedError):
-        api.sense_camera("front")
-    with pytest.raises(NotImplementedError):
-        api.sense_clock()
+    reading = api.sense_camera("front")
+    assert reading.status == "empty"
+    assert reading.raw["detections"] == []
+
+
+def test_clock_returns_now():
+    api = SensorimotorAPI(MockEnvironment.from_scenario(SCENARIO_A))
+    reading = api.sense_clock()
+    assert reading.sensor == "clock"
+    assert reading.status == "ok"
+    assert reading.value  # ISO-8601 string

@@ -1130,17 +1130,19 @@ def test_scenario_b_replay_keeps_three_perspectives_separate(scenario_b_knowledg
     }
 
 
-def test_scenario_b_against_the_real_camera_reports_not_implemented(knowledge, sensors):
-    """Documents the P2 dependency: until `sense_camera` lands, the real
-    sensorimotor layer answers with a recoverable `not_implemented`, and the
-    loop keeps going rather than dying."""
+def test_scenario_b_against_the_real_camera_returns_empty_when_no_preset(knowledge, sensors):
+    """sense_camera is now implemented (returns the scenario YAML's preset
+    reading, or an empty frame when no preset exists). The `sensors` fixture
+    here loads scenario_a.yaml, which has no camera preset, so we expect an
+    empty-but-successful observation rather than `not_implemented`."""
     script = [
         {"tool": "sense_camera", "arguments": {"direction": "front"}},
-        {"tool": "finalize_answer", "arguments": {"answer": "I cannot see right now."}},
+        {"tool": "finalize_answer", "arguments": {"answer": "I see no objects right now."}},
     ]
     result = _agent(knowledge, sensors, script).run("what do you see?", scenario="B")
 
     observation = result.trace.steps[0].observation
-    assert observation.ok is False
-    assert observation.content["kind"] == "not_implemented"
-    assert result.answer == "I cannot see right now."
+    assert observation.ok is True
+    assert observation.content["status"] == "empty"
+    assert observation.content["raw"]["detections"] == []
+    assert result.answer == "I see no objects right now."

@@ -1,0 +1,242 @@
+{
+  "query": "Is the route ahead clear? Justify your answer by inspecting your belief graph and verifying with live sensors.",
+  "scenario": "scenario_a",
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "get_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_clear"
+        }
+      },
+      "observation": {
+        "tool": "get_belief",
+        "ok": true,
+        "content": {
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 1.0,
+          "source": "default_map",
+          "perspective": "self",
+          "status": "active",
+          "observed_at": "2026-11-06T14:00:47.908841Z",
+          "provenance_id": 2
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_lidar",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_lidar",
+        "ok": true,
+        "content": {
+          "sensor": "lidar_front",
+          "kind": "distance_cm",
+          "value": 12,
+          "status": "blocked",
+          "observed_at": "2026-09-06T10:15:00.234000Z",
+          "confidence": 0.95,
+          "raw": {
+            "distance_cm": 12,
+            "material_guess": "wood",
+            "obstacle_id": "crate_A"
+          },
+          "detections": null,
+          "ambient": null
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 3,
+      "thought": null,
+      "tool_call": {
+        "name": "list_sources",
+        "arguments": {}
+      },
+      "observation": {
+        "tool": "list_sources",
+        "ok": true,
+        "content": {
+          "items": [
+            {
+              "source_id": "default_map",
+              "kind": "static_map",
+              "trust_prior": 0.6,
+              "description": "Baseline floor plan"
+            },
+            {
+              "source_id": "lidar_front",
+              "kind": "sensor",
+              "trust_prior": 0.9,
+              "description": "Front-facing LiDAR"
+            },
+            {
+              "source_id": "camera_front",
+              "kind": "sensor",
+              "trust_prior": 0.7,
+              "description": "Front-facing camera"
+            },
+            {
+              "source_id": "bot_02",
+              "kind": "agent",
+              "trust_prior": 0.5,
+              "description": "Maintenance bot #02"
+            },
+            {
+              "source_id": "user",
+              "kind": "user",
+              "trust_prior": 0.4,
+              "description": "Human operator statement"
+            },
+            {
+              "source_id": "llm_infer",
+              "kind": "llm",
+              "trust_prior": 0.2,
+              "description": "LLM inference (unverified)"
+            }
+          ]
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 4,
+      "thought": null,
+      "tool_call": {
+        "name": "downgrade_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "new_confidence": 0.1,
+          "reason": "LiDAR (trust 0.9) contradicts default_map (trust 0.6)"
+        }
+      },
+      "observation": {
+        "tool": "downgrade_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 3,
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 0.1,
+          "source_id": "default_map",
+          "perspective": "self",
+          "observed_at": "2026-11-06T14:00:47.908841Z",
+          "recorded_at": "2026-11-06T14:00:47",
+          "status": "downgraded",
+          "payload": {
+            "reason": "LiDAR (trust 0.9) contradicts default_map (trust 0.6)",
+            "supersedes": 2
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 5,
+      "thought": null,
+      "tool_call": {
+        "name": "update_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_blocked",
+          "object": "obstacle_12cm",
+          "confidence": 0.95,
+          "source": "lidar_front",
+          "perspective": "self",
+          "reason": "Front LiDAR returned blocked at 12cm; overrides stale map."
+        }
+      },
+      "observation": {
+        "tool": "update_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 4,
+          "subject": "path_ahead",
+          "predicate": "is_blocked",
+          "object": "obstacle_12cm",
+          "confidence": 0.95,
+          "source_id": "lidar_front",
+          "perspective": "self",
+          "observed_at": "2026-11-06T14:00:47.954643Z",
+          "recorded_at": "2026-11-06T14:00:47",
+          "status": "active",
+          "payload": {
+            "reason": "Front LiDAR returned blocked at 12cm; overrides stale map."
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 6,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "No \u2014 the path is BLOCKED. My floor map claimed clear, but my front LiDAR returned a hit at 12cm. I downgraded the stale map belief and wrote a new is_blocked belief sourced from lidar_front (trust prior 0.9 > default_map 0.6).",
+          "cited_beliefs": [
+            "path_ahead/is_clear",
+            "path_ahead/is_blocked"
+          ],
+          "cited_sensors": [
+            "lidar_front"
+          ]
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "No \u2014 the path is BLOCKED. My floor map claimed clear, but my front LiDAR returned a hit at 12cm. I downgraded the stale map belief and wrote a new is_blocked belief sourced from lidar_front (trust prior 0.9 > default_map 0.6).",
+          "cited_beliefs": [
+            "path_ahead/is_clear",
+            "path_ahead/is_blocked"
+          ],
+          "cited_sensors": [
+            "lidar_front"
+          ]
+        }
+      },
+      "final_answer": "No \u2014 the path is BLOCKED. My floor map claimed clear, but my front LiDAR returned a hit at 12cm. I downgraded the stale map belief and wrote a new is_blocked belief sourced from lidar_front (trust prior 0.9 > default_map 0.6)."
+    }
+  ],
+  "final_answer": "No \u2014 the path is BLOCKED. My floor map claimed clear, but my front LiDAR returned a hit at 12cm. I downgraded the stale map belief and wrote a new is_blocked belief sourced from lidar_front (trust prior 0.9 > default_map 0.6).",
+  "started_at": "2026-11-06T14:00:47.928853Z",
+  "ended_at": "2026-11-06T14:00:47.967243Z",
+  "test_id": "02_stale_map_conflict",
+  "recorded_at": "2026-11-06T14:00:47.968930+00:00",
+  "mode": "recorded",
+  "extras": {
+    "scenario": "scenario_a",
+    "expected_tool_calls": [
+      "get_belief",
+      "sense_lidar",
+      "downgrade_belief",
+      "update_belief",
+      "finalize_answer"
+    ],
+    "expected_answer_contains": [
+      "block",
+      "downgrad",
+      "downgrade",
+      "lidar"
+    ],
+    "verdict": "pass",
+    "failure_mode_tested": "LLM trusts the stale map belief, never calls sense_lidar, and reports the path is clear."
+  }
+}

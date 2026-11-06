@@ -39,10 +39,15 @@ class SensorimotorAPI:
         self,
         direction: Literal["front", "left", "right", "back"] = "front",
     ) -> SensorPayload:
-        raise NotImplementedError("Phase 3 — sense_camera lands with Scenario B.")
+        return sensors.read_camera(
+            self._env.world_state,
+            direction,
+            observed_at=self._env.now,
+            presets=self._env.sensor_presets,
+        )
 
     def sense_clock(self) -> SensorPayload:
-        raise NotImplementedError("Phase 3 — sense_clock lands with Scenario B.")
+        return sensors.read_clock(observed_at=self._env.now)
 
     # ---------- actuators (feature-flagged off for epistemic tests) ----------
 

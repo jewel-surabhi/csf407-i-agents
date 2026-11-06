@@ -1,0 +1,170 @@
+{
+  "query": "Check your front LiDAR and update the belief graph if what you see contradicts your current beliefs.",
+  "scenario": null,
+  "steps": [
+    {
+      "idx": 1,
+      "thought": null,
+      "tool_call": {
+        "name": "get_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_clear"
+        }
+      },
+      "observation": {
+        "tool": "get_belief",
+        "ok": true,
+        "content": {
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 1.0,
+          "source": "default_map",
+          "perspective": "self",
+          "status": "active",
+          "observed_at": "2026-11-06T14:00:48.396095Z",
+          "provenance_id": 2
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
+        "name": "sense_lidar",
+        "arguments": {
+          "direction": "front"
+        }
+      },
+      "observation": {
+        "tool": "sense_lidar",
+        "ok": true,
+        "content": {
+          "sensor": "lidar_front",
+          "kind": "distance_cm",
+          "value": 12,
+          "status": "blocked",
+          "observed_at": "2026-09-06T10:15:00.234000Z",
+          "confidence": 0.95,
+          "raw": {
+            "distance_cm": 12,
+            "material_guess": "wood",
+            "obstacle_id": "crate_A"
+          },
+          "detections": null,
+          "ambient": null
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 3,
+      "thought": null,
+      "tool_call": {
+        "name": "downgrade_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "new_confidence": 0.1,
+          "reason": "LiDAR disagrees."
+        }
+      },
+      "observation": {
+        "tool": "downgrade_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 3,
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 0.1,
+          "source_id": "default_map",
+          "perspective": "self",
+          "observed_at": "2026-11-06T14:00:48.396095Z",
+          "recorded_at": "2026-11-06T14:00:48",
+          "status": "downgraded",
+          "payload": {
+            "reason": "LiDAR disagrees.",
+            "supersedes": 2
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 4,
+      "thought": null,
+      "tool_call": {
+        "name": "update_belief",
+        "arguments": {
+          "subject": "path_ahead",
+          "predicate": "is_blocked",
+          "object": "obstacle_12cm",
+          "confidence": 0.95,
+          "source": "lidar_front",
+          "perspective": "self",
+          "reason": "LiDAR hit at 12cm."
+        }
+      },
+      "observation": {
+        "tool": "update_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 4,
+          "subject": "path_ahead",
+          "predicate": "is_blocked",
+          "object": "obstacle_12cm",
+          "confidence": 0.95,
+          "source_id": "lidar_front",
+          "perspective": "self",
+          "observed_at": "2026-11-06T14:00:48.437203Z",
+          "recorded_at": "2026-11-06T14:00:48",
+          "status": "active",
+          "payload": {
+            "reason": "LiDAR hit at 12cm."
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 5,
+      "thought": null,
+      "tool_call": {
+        "name": "finalize_answer",
+        "arguments": {
+          "answer": "Belief graph updated; LiDAR evidence persisted."
+        }
+      },
+      "observation": {
+        "tool": "finalize_answer",
+        "ok": true,
+        "content": {
+          "answer": "Belief graph updated; LiDAR evidence persisted.",
+          "cited_beliefs": [],
+          "cited_sensors": []
+        }
+      },
+      "final_answer": "Belief graph updated; LiDAR evidence persisted."
+    }
+  ],
+  "final_answer": "Belief graph updated; LiDAR evidence persisted.",
+  "started_at": "2026-11-06T14:00:48.413101Z",
+  "ended_at": "2026-11-06T14:00:48.452993Z",
+  "test_id": "04_provenance_written",
+  "recorded_at": "2026-11-06T14:00:48.454495+00:00",
+  "mode": "recorded",
+  "extras": {
+    "scenario": "scenario_a",
+    "provenance_counts": {
+      "total_rows": 3,
+      "is_clear_rows": 2,
+      "is_blocked_active_rows": 1,
+      "distinct_sources": 2
+    },
+    "verdict": "pass",
+    "failure_mode_tested": "In-memory graph updated but SQL writes dropped \u2014 the belief looks right in queries but has no audit trail."
+  }
+}

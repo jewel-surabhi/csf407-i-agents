@@ -38,6 +38,9 @@ ENV/
 # Runtime traces
 data/runs/*
 !data/runs/.gitkeep
+# The 10 epistemic trace logs are the graded proposal deliverable.
+!data/runs/epistemic
+!data/runs/epistemic/**
 
 # Test / coverage artifacts
 .pytest_cache/

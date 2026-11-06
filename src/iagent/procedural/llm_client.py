@@ -162,12 +162,24 @@ class LLMClient:
     ) -> AssistantResponse:
         """Call the provider, retrying transient failures with backoff.
 
-        A *malformed* generation is retried too: small models sometimes emit a
-        tool call whose `arguments` are not valid JSON, and at temperature 0 a
-        resample is still worth one try. If every attempt comes back malformed
-        the last response is returned anyway rather than raised -- the
-        dispatcher turns it into a `missing_argument` observation the LLM can
-        recover from, which beats aborting the episode.
+        Two small-model failure modes are handled here:
+
+        * Server-side rejection (Groq returns 400 ``tool_use_failed`` because
+          the model emitted an invalid tool name like ``commentary`` or args
+          that failed Groq's own JSON validator). Retrying the same prompt
+          reproduces it, so we short-circuit and return a free-text
+          ``AssistantResponse`` carrying a SELF-CORRECTION diagnostic. The
+          react_loop surfaces that as a nudge and the model gets one more
+          turn to produce a well-formed tool call.
+        * Client-side parse failure (Groq accepted the generation but our
+          ``_normalize`` could not parse the args as JSON, flagging the
+          response as ``malformed``). We resample — at temperature 0 the
+          second try often succeeds. If every attempt comes back malformed
+          the last response is returned anyway so the dispatcher turns it
+          into a ``missing_argument`` observation the LLM can recover from.
+
+        Only if every retry raised *and* we never got a malformed response
+        do we give up and raise ``LLMClientError``.
         """
         last_exc: Exception | None = None
         last_malformed: AssistantResponse | None = None
@@ -184,6 +196,19 @@ class LLMClient:
                 )
             except Exception as exc:  # noqa: BLE001 — provider errors vary widely
                 last_exc = exc
+                if _is_tool_use_failed(exc):
+                    # The model emitted a malformed tool call. Retrying is
+                    # pointless — convert to a recoverable diagnostic.
+                    return AssistantResponse(
+                        content=(
+                            "SELF-CORRECTION: my previous tool call was "
+                            "rejected by the runtime (invalid tool name or "
+                            "malformed JSON arguments). I will call a listed "
+                            "tool with well-formed arguments next."
+                        ),
+                        tool_calls=[],
+                        finish_reason="tool_use_failed",
+                    )
                 if attempt == self.max_retries:
                     break
                 self._sleep(_backoff(attempt))
@@ -298,6 +323,29 @@ def _env_int(name: str) -> int | None:
 # ---------------------------------------------------------------------------
 # Deterministic recorded client (for tests)
 # ---------------------------------------------------------------------------
+
+
+def _is_tool_use_failed(exc: Exception) -> bool:
+    """True if `exc` is a Groq BadRequestError about a mangled generation.
+
+    Covers the three known small-model failure modes Groq rejects with 400:
+      * `tool_use_failed`   — invented tool name or malformed JSON args
+      * `tool call validation failed` — same family, different wording
+      * `Failed to parse tool call arguments` — parse-level reject
+      * `output_parse_failed`   — model emitted free text instead of a tool
+                                  call when tool_choice="auto" required one
+
+    Looks for the known error-code strings rather than importing groq's
+    exception classes (keeps the dependency soft — RecordedLLMClient users
+    don't need the groq package).
+    """
+    msg = str(exc)
+    return (
+        "tool_use_failed" in msg
+        or "tool call validation failed" in msg
+        or "Failed to parse tool call arguments" in msg
+        or "output_parse_failed" in msg
+    )
 
 
 class RecordedLLMClient:
