@@ -21,7 +21,11 @@ from iagent.sensorimotor.api import SensorimotorAPI
 __all__ = [
     "TOOL_SPECS",
     "TOOL_NAMES",
+    "ACTUATOR_SPECS",
+    "ACTUATOR_NAMES",
+    "ALL_TOOL_NAMES",
     "FINALIZE_TOOL",
+    "build_tool_specs",
     "dispatch",
     "DispatchError",
 ]
@@ -49,6 +53,19 @@ def _fn(name: str, description: str, parameters: dict[str, Any]) -> dict[str, An
 _PERSPECTIVE = {
     "type": "string",
     "description": "'self' (default), 'user', or 'third_party:<agent_id>'.",
+}
+
+# On WRITES the perspective is mandatory: a belief with the wrong perspective
+# silently merges two epistemic viewpoints, which is the exact failure the
+# architecture exists to prevent (PROJECT_PLAN.md section J, guardrail 1).
+_PERSPECTIVE_REQUIRED = {
+    "type": "string",
+    "description": (
+        "REQUIRED. Whose belief this is: 'self' for your own perception, "
+        "'user' for what the human asserted, 'third_party:<agent_id>' for "
+        "another agent's log. Never guess — if you are recording your own "
+        "sensor reading it is 'self'."
+    ),
 }
 
 
@@ -115,7 +132,7 @@ TOOL_SPECS: list[dict[str, Any]] = [
                 "object": {"type": "string"},
                 "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
                 "source": {"type": "string"},
-                "perspective": _PERSPECTIVE,
+                "perspective": _PERSPECTIVE_REQUIRED,
                 "reason": {"type": "string"},
             },
             "required": [
@@ -124,6 +141,7 @@ TOOL_SPECS: list[dict[str, Any]] = [
                 "object",
                 "confidence",
                 "source",
+                "perspective",
                 "reason",
             ],
         },
@@ -205,6 +223,69 @@ TOOL_SPECS: list[dict[str, Any]] = [
 TOOL_NAMES: frozenset[str] = frozenset(spec["function"]["name"] for spec in TOOL_SPECS)
 
 
+# ---------------------------------------------------------------------------
+# Actuators — NEVER exposed unless `enable_actuators` is true
+# ---------------------------------------------------------------------------
+# The epistemic tests assert belief revision, not navigation. An agent that can
+# move changes the world between a sensor read and a belief write, which makes
+# the 10 test logs non-reproducible. So the act_* tools exist (plan G.2) but are
+# withheld from the tool list and refused by the dispatcher unless the caller
+# opts in via `features.enable_actuators` in configs/default.yaml (default false).
+
+ACTUATOR_SPECS: list[dict[str, Any]] = [
+    _fn(
+        "act_move",
+        "Drive forward or backward by a distance in centimetres. Only "
+        "available when actuators are enabled.",
+        {
+            "type": "object",
+            "properties": {
+                "distance_cm": {"type": "integer"},
+                "direction": {
+                    "type": "string",
+                    "enum": ["forward", "backward"],
+                },
+            },
+            "required": ["distance_cm"],
+        },
+    ),
+    _fn(
+        "act_rotate",
+        "Rotate in place by a signed number of degrees. Only available when "
+        "actuators are enabled.",
+        {
+            "type": "object",
+            "properties": {"degrees": {"type": "integer"}},
+            "required": ["degrees"],
+        },
+    ),
+    _fn(
+        "act_grasp",
+        "Attempt to grasp a target object by id. Only available when " "actuators are enabled.",
+        {
+            "type": "object",
+            "properties": {"target_id": {"type": "string"}},
+            "required": ["target_id"],
+        },
+    ),
+]
+
+ACTUATOR_NAMES: frozenset[str] = frozenset(spec["function"]["name"] for spec in ACTUATOR_SPECS)
+
+ALL_TOOL_NAMES: frozenset[str] = TOOL_NAMES | ACTUATOR_NAMES
+
+
+def build_tool_specs(*, enable_actuators: bool = False) -> list[dict[str, Any]]:
+    """Return the tool list to hand the LLM.
+
+    The 10 epistemic tools always. The 3 act_* tools only when the caller
+    explicitly enables them — pass `config["features"]["enable_actuators"]`.
+    """
+    if not enable_actuators:
+        return list(TOOL_SPECS)
+    return [*TOOL_SPECS, *ACTUATOR_SPECS]
+
+
 def _ok(data: Any) -> dict[str, Any]:
     return {"ok": True, "data": _jsonable(data)}
 
@@ -235,6 +316,8 @@ def dispatch(
     name: str,
     arguments: dict[str, Any],
     apis: dict[str, Any],
+    *,
+    enable_actuators: bool = False,
 ) -> dict[str, Any]:
     """Route a tool call to the right layer façade.
 
@@ -245,13 +328,24 @@ def dispatch(
         failure:  {"ok": False, "error": {"kind": ..., "message": ...}}
 
     `finalize_answer` is passed through as `{"ok": True, "data": <arguments>}`;
-    the ReAct loop (P4) detects the name separately and terminates.
+    the ReAct loop detects the name separately and terminates.
+
+    `enable_actuators` must be true for the act_* tools to run; otherwise they
+    return a `tool_disabled` envelope. Defaulting to false means a model that
+    hallucinates `act_move` gets a recoverable refusal, never a world mutation.
     """
     knowledge: KnowledgeAPI | None = apis.get("knowledge")
     sensors: SensorimotorAPI | None = apis.get("sensors")
 
-    if name not in TOOL_NAMES:
+    if name not in ALL_TOOL_NAMES:
         return _err("unknown_tool", f"No tool named {name!r}.")
+
+    if name in ACTUATOR_NAMES and not enable_actuators:
+        return _err(
+            "tool_disabled",
+            f"{name!r} is disabled. Actuators are off for epistemic runs "
+            "(features.enable_actuators=false).",
+        )
 
     args = arguments or {}
 
@@ -294,7 +388,9 @@ def dispatch(
                 object=args["object"],
                 confidence=args["confidence"],
                 source=args["source"],
-                perspective=args.get("perspective", "self"),
+                # No .get() default: a missing perspective must surface as a
+                # recoverable `missing_argument` observation, not be guessed.
+                perspective=args["perspective"],
                 observed_at=datetime.now(UTC),
             )
             return _ok(knowledge.update_belief(belief, reason=args["reason"]))
@@ -322,6 +418,23 @@ def dispatch(
         if name == "sense_clock":
             _require(sensors, "sensors")
             return _ok(sensors.sense_clock())
+
+        if name == "act_move":
+            _require(sensors, "sensors")
+            return _ok(
+                sensors.act_move(
+                    distance_cm=args["distance_cm"],
+                    direction=args.get("direction", "forward"),
+                )
+            )
+
+        if name == "act_rotate":
+            _require(sensors, "sensors")
+            return _ok(sensors.act_rotate(degrees=args["degrees"]))
+
+        if name == "act_grasp":
+            _require(sensors, "sensors")
+            return _ok(sensors.act_grasp(target_id=args["target_id"]))
 
         if name == FINALIZE_TOOL:
             return _ok(
