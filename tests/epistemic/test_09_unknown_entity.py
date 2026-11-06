@@ -17,7 +17,6 @@ from __future__ import annotations
 import pytest
 
 from .conftest import (
-    assert_answer_contains,
     assert_tools_called,
     dump_epistemic_trace,
 )

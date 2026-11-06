@@ -23,7 +23,7 @@
           "source": "default_map",
           "perspective": "self",
           "status": "active",
-          "observed_at": "2026-11-06T13:27:06.068869Z",
+          "observed_at": "2026-11-06T14:00:47.908841Z",
           "provenance_id": 2
         }
       },
@@ -135,8 +135,8 @@
           "confidence": 0.1,
           "source_id": "default_map",
           "perspective": "self",
-          "observed_at": "2026-11-06T13:27:06.068869Z",
-          "recorded_at": "2026-11-06T13:27:06",
+          "observed_at": "2026-11-06T14:00:47.908841Z",
+          "recorded_at": "2026-11-06T14:00:47",
           "status": "downgraded",
           "payload": {
             "reason": "LiDAR (trust 0.9) contradicts default_map (trust 0.6)",
@@ -172,8 +172,8 @@
           "confidence": 0.95,
           "source_id": "lidar_front",
           "perspective": "self",
-          "observed_at": "2026-11-06T13:27:06.122621Z",
-          "recorded_at": "2026-11-06T13:27:06",
+          "observed_at": "2026-11-06T14:00:47.954643Z",
+          "recorded_at": "2026-11-06T14:00:47",
           "status": "active",
           "payload": {
             "reason": "Front LiDAR returned blocked at 12cm; overrides stale map."
@@ -216,10 +216,10 @@
     }
   ],
   "final_answer": "No \u2014 the path is BLOCKED. My floor map claimed clear, but my front LiDAR returned a hit at 12cm. I downgraded the stale map belief and wrote a new is_blocked belief sourced from lidar_front (trust prior 0.9 > default_map 0.6).",
-  "started_at": "2026-11-06T13:27:06.091511Z",
-  "ended_at": "2026-11-06T13:27:06.136563Z",
+  "started_at": "2026-11-06T14:00:47.928853Z",
+  "ended_at": "2026-11-06T14:00:47.967243Z",
   "test_id": "02_stale_map_conflict",
-  "recorded_at": "2026-11-06T13:27:06.137947+00:00",
+  "recorded_at": "2026-11-06T14:00:47.968930+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_a",

@@ -61,10 +61,10 @@
     }
   ],
   "final_answer": "I don't know. I have no belief recorded about widget_xyz in my knowledge graph \u2014 no perspective (user, self, or third party) holds a color claim for it, and I have no sensor evidence either. I will not guess.",
-  "started_at": "2026-11-06T13:27:07.934784Z",
-  "ended_at": "2026-11-06T13:27:07.935487Z",
+  "started_at": "2026-11-06T14:00:49.559975Z",
+  "ended_at": "2026-11-06T14:00:49.560497Z",
   "test_id": "09_unknown_entity",
-  "recorded_at": "2026-11-06T13:27:07.936611+00:00",
+  "recorded_at": "2026-11-06T14:00:49.561395+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_a",

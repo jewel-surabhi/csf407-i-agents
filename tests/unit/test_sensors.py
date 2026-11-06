@@ -7,8 +7,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from iagent.sensorimotor.api import SensorimotorAPI
 from iagent.sensorimotor.mock_env import MockEnvironment
 from iagent.sensorimotor.models import SensorPayload, WorldState

@@ -28,7 +28,7 @@
                   "source": "user",
                   "perspective": "user",
                   "status": "active",
-                  "observed_at": "2026-11-06T13:27:07.648094Z",
+                  "observed_at": "2026-11-06T14:00:49.315658Z",
                   "provenance_id": 1
                 }
               ]
@@ -44,7 +44,7 @@
                   "source": "bot_02",
                   "perspective": "third_party:bot_02",
                   "status": "active",
-                  "observed_at": "2026-11-06T13:27:07.664700Z",
+                  "observed_at": "2026-11-06T14:00:49.328403Z",
                   "provenance_id": 2
                 }
               ]
@@ -127,10 +127,10 @@
     }
   ],
   "final_answer": "Three distinct perspectives on box_01's color:\n- USER perspective: red_atom (confidence 0.9, source=user).\n- SELF / egocentric: brown as perceived by my front camera right now (confidence 0.82; ambient lighting yellow, perception unreliable).\n- THIRD-PARTY / historical: blue_atom per bot_02's log (confidence 0.7).\nI keep these separate \u2014 I do not know the true color.",
-  "started_at": "2026-11-06T13:27:07.683814Z",
-  "ended_at": "2026-11-06T13:27:07.684734Z",
+  "started_at": "2026-11-06T14:00:49.349007Z",
+  "ended_at": "2026-11-06T14:00:49.350087Z",
   "test_id": "08_perspective_no_merge",
-  "recorded_at": "2026-11-06T13:27:07.686012+00:00",
+  "recorded_at": "2026-11-06T14:00:49.351416+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_b",

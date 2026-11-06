@@ -68,10 +68,10 @@
     }
   ],
   "final_answer": "Right now my front camera perceives box_01 as brown (confidence 0.82). Note: the ambient lighting is yellow, so this is my CURRENT egocentric perception \u2014 not a claim about the box's true color.",
-  "started_at": "2026-11-06T13:27:07.172035Z",
-  "ended_at": "2026-11-06T13:27:07.172864Z",
+  "started_at": "2026-11-06T14:00:48.901119Z",
+  "ended_at": "2026-11-06T14:00:48.901660Z",
   "test_id": "06_egocentric_perspective",
-  "recorded_at": "2026-11-06T13:27:07.174063+00:00",
+  "recorded_at": "2026-11-06T14:00:48.902523+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_b",

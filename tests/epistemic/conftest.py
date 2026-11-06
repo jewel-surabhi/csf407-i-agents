@@ -24,7 +24,7 @@ import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 import yaml
@@ -34,16 +34,16 @@ from dotenv import load_dotenv
 # Safe for recorded tests too — the recorded path never touches Groq.
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-from iagent.declarative.api import KnowledgeAPI
-from iagent.declarative.belief_graph import BeliefGraph
-from iagent.declarative.models import Belief
-from iagent.declarative.provenance import ProvenanceStore
-from iagent.declarative.seeding import seed_sources
-from iagent.procedural.agent import Agent
-from iagent.procedural.llm_client import RecordedLLMClient
-from iagent.procedural.models import Trace
-from iagent.sensorimotor.api import SensorimotorAPI
-from iagent.sensorimotor.mock_env import MockEnvironment
+from iagent.declarative.api import KnowledgeAPI  # noqa: E402  (after load_dotenv, intentional)
+from iagent.declarative.belief_graph import BeliefGraph  # noqa: E402
+from iagent.declarative.models import Belief  # noqa: E402
+from iagent.declarative.provenance import ProvenanceStore  # noqa: E402
+from iagent.declarative.seeding import seed_sources  # noqa: E402
+from iagent.procedural.agent import Agent  # noqa: E402
+from iagent.procedural.llm_client import RecordedLLMClient  # noqa: E402
+from iagent.procedural.models import Trace  # noqa: E402
+from iagent.sensorimotor.api import SensorimotorAPI  # noqa: E402
+from iagent.sensorimotor.mock_env import MockEnvironment  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -199,7 +199,7 @@ def _agent_runner(
 
 # Track the live agents a test touched so pytest_runtest_makereport can
 # dump their traces on failure. Keyed by nodeid.
-_LIVE_AGENTS: dict[str, "_TracingAgent"] = {}
+_LIVE_AGENTS: dict[str, _TracingAgent] = {}
 
 
 @pytest.fixture()

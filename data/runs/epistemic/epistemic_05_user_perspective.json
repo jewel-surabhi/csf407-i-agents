@@ -28,7 +28,7 @@
                   "source": "user",
                   "perspective": "user",
                   "status": "active",
-                  "observed_at": "2026-11-06T13:27:06.869856Z",
+                  "observed_at": "2026-11-06T14:00:48.642150Z",
                   "provenance_id": 1
                 }
               ]
@@ -44,7 +44,7 @@
                   "source": "bot_02",
                   "perspective": "third_party:bot_02",
                   "status": "active",
-                  "observed_at": "2026-11-06T13:27:06.884158Z",
+                  "observed_at": "2026-11-06T14:00:48.656472Z",
                   "provenance_id": 2
                 }
               ]
@@ -81,10 +81,10 @@
     }
   ],
   "final_answer": "From the user's perspective, box_01 is red_atom (confidence 0.9, source=user). This is their belief \u2014 I have not verified it against my own sensors.",
-  "started_at": "2026-11-06T13:27:06.908461Z",
-  "ended_at": "2026-11-06T13:27:06.909268Z",
+  "started_at": "2026-11-06T14:00:48.677399Z",
+  "ended_at": "2026-11-06T14:00:48.678510Z",
   "test_id": "05_user_perspective",
-  "recorded_at": "2026-11-06T13:27:06.910449+00:00",
+  "recorded_at": "2026-11-06T14:00:48.679743+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_b",
