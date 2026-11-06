@@ -9,13 +9,15 @@ import pytest
 
 from iagent.declarative.api import Belief, KnowledgeError, PerspectiveView, ProvenanceEntry, Source
 from iagent.procedural.tools import (
+    ACTUATOR_NAMES,
     FINALIZE_TOOL,
     TOOL_NAMES,
     TOOL_SPECS,
     DispatchError,
+    build_tool_specs,
     dispatch,
 )
-from iagent.sensorimotor.api import SensorPayload
+from iagent.sensorimotor.api import ActionResult, SensorPayload
 
 # --------------------------------------------------------------------------
 # Fakes — layer isolation lets us swap the real façades for spies.
@@ -327,6 +329,7 @@ def test_dispatch_invalid_confidence_reports_validation_error(apis):
             "object": "z",
             "confidence": 1.5,  # out of [0,1]
             "source": "s",
+            "perspective": "self",
             "reason": "r",
         },
         apis,
@@ -361,3 +364,110 @@ def test_dispatch_wraps_unexpected_exception(apis):
 def test_dispatch_missing_api_raises_dispatch_error(apis):
     with pytest.raises(DispatchError):
         dispatch("get_belief", {"subject": "x", "predicate": "y"}, {"sensors": apis["sensors"]})
+
+
+# --------------------------------------------------------------------------
+# perspective is mandatory on the write path (anti-merging guardrail)
+# --------------------------------------------------------------------------
+
+
+def _update_args(**overrides: Any) -> dict[str, Any]:
+    args = {
+        "subject": "box_01",
+        "predicate": "has_color",
+        "object": "brown_atom",
+        "confidence": 0.82,
+        "source": "camera_front",
+        "perspective": "self",
+        "reason": "live camera reading",
+    }
+    args.update(overrides)
+    return args
+
+
+def test_update_belief_schema_marks_perspective_required():
+    """PROJECT_PLAN.md J, guardrail 1: the LLM cannot omit the perspective."""
+    spec = next(s for s in TOOL_SPECS if s["function"]["name"] == "update_belief")
+    assert "perspective" in spec["function"]["parameters"]["required"]
+
+
+def test_dispatch_update_belief_without_perspective_is_a_recoverable_error(apis):
+    """Omitting perspective must NOT silently default to 'self' — that would
+    merge the user's belief into the agent's own."""
+    args = _update_args()
+    del args["perspective"]
+
+    result = dispatch("update_belief", args, apis)
+
+    assert result["ok"] is False
+    assert result["error"]["kind"] == "missing_argument"
+    assert "perspective" in result["error"]["message"]
+    # Nothing was written.
+    assert apis["knowledge"].calls == []
+
+
+def test_dispatch_update_belief_preserves_non_self_perspective(apis):
+    dispatch("update_belief", _update_args(perspective="third_party:bot_02"), apis)
+    written = apis["knowledge"].calls[0][1]["belief"]
+    assert written["perspective"] == "third_party:bot_02"
+
+
+# --------------------------------------------------------------------------
+# actuator gating
+# --------------------------------------------------------------------------
+
+
+def test_actuators_absent_from_the_default_tool_list():
+    assert ACTUATOR_NAMES.isdisjoint(TOOL_NAMES)
+    assert [s["function"]["name"] for s in build_tool_specs()] == [
+        s["function"]["name"] for s in TOOL_SPECS
+    ]
+
+
+def test_build_tool_specs_appends_actuators_when_enabled():
+    names = [s["function"]["name"] for s in build_tool_specs(enable_actuators=True)]
+    assert set(names) == set(TOOL_NAMES) | set(ACTUATOR_NAMES)
+    # The 10 epistemic tools keep their order; actuators are appended.
+    assert names[: len(TOOL_SPECS)] == [s["function"]["name"] for s in TOOL_SPECS]
+
+
+@pytest.mark.parametrize(
+    ("name", "args"),
+    [
+        ("act_move", {"distance_cm": 30}),
+        ("act_rotate", {"degrees": 90}),
+        ("act_grasp", {"target_id": "box_01"}),
+    ],
+)
+def test_dispatch_refuses_actuators_by_default(name, args, apis):
+    result = dispatch(name, args, apis)
+    assert result["ok"] is False
+    assert result["error"]["kind"] == "tool_disabled"
+    assert apis["sensors"].calls == []
+
+
+def test_dispatch_runs_actuator_when_explicitly_enabled(apis):
+    class ActuatingSensors(FakeSensors):
+        def act_move(self, distance_cm, direction="forward"):
+            self.calls.append(("act_move", {"distance_cm": distance_cm, "direction": direction}))
+            return ActionResult(
+                action="act_move",
+                params={"distance_cm": distance_cm, "direction": direction},
+                success=False,
+                reason="obstacle detected at 12cm",
+                observed_at=datetime(2026, 1, 1, tzinfo=UTC),
+            )
+
+    apis["sensors"] = ActuatingSensors()
+    result = dispatch("act_move", {"distance_cm": 30}, apis, enable_actuators=True)
+
+    assert result["ok"] is True
+    assert result["data"]["success"] is False
+    assert apis["sensors"].calls == [("act_move", {"distance_cm": 30, "direction": "forward"})]
+
+
+def test_actuator_name_is_known_not_unknown(apis):
+    """A gated tool is 'disabled', not 'unknown' — the distinction matters for
+    the LLM's recovery path."""
+    assert dispatch("act_move", {"distance_cm": 1}, apis)["error"]["kind"] == "tool_disabled"
+    assert dispatch("teleport", {}, apis)["error"]["kind"] == "unknown_tool"
