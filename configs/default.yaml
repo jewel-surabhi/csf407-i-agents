@@ -12,6 +12,12 @@ llm:
 react:
   max_steps: 8
   cite_sources_required: true
+  # Context guard (PROJECT_PLAN.md H.5). Once the serialized message log is
+  # estimated above token_budget, only the most recent max_context_messages
+  # are kept -- the system prompt always survives, and an assistant tool_calls
+  # turn is never split from the tool results that answer it.
+  token_budget: 6000
+  max_context_messages: 8
 
 paths:
   db: ./iagent.db
