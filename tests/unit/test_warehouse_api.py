@@ -28,9 +28,9 @@ def test_get_view_returns_topology_and_scored_options(client):
     body = r.json()
     assert body["position"] == "A-S"
     assert body["goal"] == "WIDGET-42"
-    assert len(body["junctions"]) == 9
-    assert len(body["segments"]) == 12
-    assert len(body["options"]) == 2  # from A-S
+    assert len(body["junctions"]) == 20
+    assert len(body["segments"]) == 31
+    assert len(body["options"]) == 2  # A-S connects to B-S + A-D
     assert all("confidence" in o for o in body["options"])
 
 
@@ -56,9 +56,9 @@ def test_move_rejects_non_adjacent(client):
 def test_blocked_segment_is_low_confidence_over_http(client):
     client.post("/api/warehouse/move", json={"to": "B-S"})
     opts = client.get("/api/warehouse/options").json()
-    bm = next(o for o in opts if o["to"] == "B-M")
-    assert bm["passable"] is False
-    assert bm["confidence"] <= 0.15
+    bd = next(o for o in opts if o["to"] == "B-D")  # was B-M in 3x3 layout
+    assert bd["passable"] is False
+    assert bd["confidence"] <= 0.15
 
 
 def test_inventory_reconciliation_over_http(client):
@@ -77,6 +77,19 @@ def test_transfer_over_http(client):
     assert r.json()["ok"] is True
     after = client.get("/api/warehouse/inventory/WIDGET-42").json()["reconciled"]
     assert after == before - 10
+
+
+def test_provenance_timeline_lists_disputed_sources(client):
+    r = client.get("/api/warehouse/provenance/WIDGET-42")
+    assert r.status_code == 200
+    rows = r.json()
+    # The three seeded source perspectives for WIDGET-42 must each show up as
+    # its own provenance row, with perspective labels preserved end-to-end.
+    sources = {row["source_id"] for row in rows}
+    perspectives = {row["perspective"] for row in rows}
+    assert {"erp_system", "warehouse_scanner", "sales_log"} <= sources
+    assert "self" in perspectives
+    assert any(p.startswith("third_party:") for p in perspectives)
 
 
 def test_transfer_insufficient_stock_over_http(client):

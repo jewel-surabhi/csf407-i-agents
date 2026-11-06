@@ -65,8 +65,8 @@ button{font-family:inherit}
 
 /* stage */
 .stage{position:relative;flex:1;min-height:0;overflow:hidden}
-.floorwrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:12px}
-svg.floor{width:100%;height:100%;max-width:1060px;display:block}
+.floorwrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:8px}
+svg.floor{width:100%;height:100%;max-width:1500px;display:block}
 svg.floor text{font-family:var(--f-sign)}
 .seg{transition:opacity .12s}
 .seg.reachable{cursor:pointer}
@@ -122,6 +122,29 @@ svg.floor text{font-family:var(--f-sign)}
 .srcrow{display:flex;align-items:center;gap:8px;font-size:12.5px}
 .srcrow .nm{flex:1;min-width:0} .srcrow .tw{font-family:var(--f-mono);font-size:11px;color:var(--ink-3)}
 .srcrow .ct{font-family:var(--f-mono);font-weight:500}
+
+/* perspective chips (self / user / third-party) — Scenario B's three views. */
+.psp{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  padding:2px 6px;border-radius:5px;margin-right:4px;vertical-align:1px;font-family:var(--f-sign)}
+.psp-self{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.psp-user{background:color-mix(in srgb,var(--robot) 20%,transparent);color:var(--robot)}
+.psp-third{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+
+/* provenance timeline — SQLite history log, shown under a selected shelf. */
+.prov{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;
+  border-left:2px dashed var(--line);padding-left:10px;margin-left:3px}
+.pv{display:flex;gap:7px;align-items:baseline;font-size:11.5px;position:relative}
+.pv::before{content:"";position:absolute;left:-14px;top:5px;width:7px;height:7px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 0 2px var(--panel)}
+.pv-downgraded::before{background:var(--warn)}
+.pv-retracted::before{background:var(--blocked)}
+.pv-t{font-family:var(--f-mono);font-size:10.5px;color:var(--ink-3);flex:none;min-width:34px}
+.pv-m{flex:1;min-width:0;line-height:1.4}
+.pv-m .ct{font-family:var(--f-mono);font-weight:600;color:var(--ink)}
+.pv-m .tw{font-family:var(--f-mono);font-size:10.5px;color:var(--ink-3)}
+.pv-s{font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  padding:1px 5px;border-radius:4px;background:var(--warn-bg);color:var(--warn);flex:none}
+.pv-downgraded{opacity:.85}
 .reconcile{font-size:12.5px;background:var(--clear-bg);color:var(--clear);border-radius:9px;padding:8px 10px;font-weight:500}
 .ctx .close{position:absolute;top:9px;right:10px;border:none;background:transparent;color:var(--ink-2);cursor:pointer;font-size:16px}
 .xfer{display:flex;flex-direction:column;gap:7px;margin-top:3px}
@@ -179,6 +202,27 @@ svg.floor text{font-family:var(--f-sign)}
 .belief .bid{font-family:var(--f-mono);font-size:12px;flex:1;min-width:0} .belief .bid .pred{color:var(--ink-2)}
 .belief .conf{font-family:var(--f-mono);font-size:12px;color:var(--ink-2)}
 .belief .bst{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 7px;border-radius:999px;background:var(--clear-bg);color:var(--clear)}
+
+/* ReAct trace step card — thought + tool_call(args) + observation payload. */
+.step{border:1px solid var(--line);border-radius:11px;background:var(--panel-2);padding:9px 11px;
+  display:flex;flex-direction:column;gap:7px}
+.step-h{display:flex;align-items:center;gap:6px}
+.step-i{font-family:var(--f-mono);font-size:11px;color:var(--ink-3);min-width:22px}
+.step-tag{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 6px;border-radius:5px;font-family:var(--f-sign)}
+.step-tag.tc{background:color-mix(in srgb,var(--robot) 20%,transparent);color:var(--robot)}
+.step-tag.ok{background:var(--clear-bg);color:var(--clear)}
+.step-tag.err{background:var(--blocked-bg);color:var(--blocked)}
+.step-tag.fa{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--accent)}
+.step-th{font-size:12.5px;line-height:1.45;color:var(--ink);font-style:italic}
+.step-tc{display:flex;flex-direction:column;gap:3px}
+.step-tc .tc-name{font-family:var(--f-mono);font-size:12px;color:var(--ink);
+  background:var(--panel);border:1px solid var(--line);padding:2px 7px;border-radius:5px;align-self:flex-start}
+.step-tc .tc-args, .step-ob{font-family:var(--f-mono);font-size:11px;line-height:1.4;
+  background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 9px;
+  margin:0;white-space:pre-wrap;word-break:break-word;color:var(--ink-2);max-height:160px;overflow:auto}
+.step-fa{font-size:13px;line-height:1.5;color:var(--ink);background:var(--clear-bg);
+  border:1px solid var(--clear);border-radius:8px;padding:8px 11px}
 .trust{display:flex;flex-direction:column;gap:7px} .trow{display:flex;align-items:center;gap:10px}
 .trow .tn{font-size:12.5px;width:120px;flex:none} .trow .tn .kd{display:block;font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
 .trow .bar{flex:1;height:8px;border-radius:999px;background:var(--line-2);overflow:hidden;min-width:0} .trow .bar>i{display:block;height:100%;border-radius:999px}

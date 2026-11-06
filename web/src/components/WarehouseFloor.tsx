@@ -20,23 +20,23 @@ export default function WarehouseFloor({ view, pathMap, onMove, onSelectShelf }:
   return (
     <svg
       className="floor"
-      viewBox="0 0 1040 660"
+      viewBox="0 0 1240 700"
       preserveAspectRatio="xMidYMid meet"
       aria-label="Warehouse floor"
     >
-      <rect x="8" y="8" width="1024" height="644" rx="18" fill="var(--floor)" stroke="var(--line)" />
+      <rect x="8" y="8" width="1224" height="684" rx="18" fill="var(--floor)" stroke="var(--line)" />
       <g opacity="0.5">
-        {Array.from({ length: 16 }, (_, i) => 70 + i * 58).map((x) => (
-          <line key={"vx" + x} x1={x} y1="20" x2={x} y2="632" stroke="var(--floor-2)" strokeWidth="1" />
+        {Array.from({ length: 20 }, (_, i) => 70 + i * 58).map((x) => (
+          <line key={"vx" + x} x1={x} y1="20" x2={x} y2="672" stroke="var(--floor-2)" strokeWidth="1" />
         ))}
-        {Array.from({ length: 10 }, (_, i) => 70 + i * 58).map((y) => (
-          <line key={"hz" + y} x1="20" y1={y} x2="1020" y2={y} stroke="var(--floor-2)" strokeWidth="1" />
+        {Array.from({ length: 11 }, (_, i) => 70 + i * 58).map((y) => (
+          <line key={"hz" + y} x1="20" y1={y} x2="1220" y2={y} stroke="var(--floor-2)" strokeWidth="1" />
         ))}
       </g>
 
-      {/* zone strips */}
-      <ZoneStrip label="LOADING BAY" x={24} y={90} w={116} h={470} hazardRight />
-      <ZoneStrip label="DISPATCH" x={900} y={90} w={116} h={470} />
+      {/* zone strips — flank the whole aisle grid (A..E) */}
+      <ZoneStrip label="LOADING BAY" x={20} y={80} w={110} h={520} hazardRight />
+      <ZoneStrip label="DISPATCH" x={1110} y={80} w={110} h={520} />
 
       {/* segments */}
       {view.segments.map((s) => {
@@ -57,20 +57,20 @@ export default function WarehouseFloor({ view, pathMap, onMove, onSelectShelf }:
             {opt && (
               <line
                 x1={A.x} y1={A.y} x2={B.x} y2={B.y}
-                stroke={tierColor(opt.tier)} strokeWidth="17" strokeLinecap="round"
+                stroke={tierColor(opt.tier)} strokeWidth="26" strokeLinecap="round"
                 opacity="0.22" className="pulse"
               />
             )}
             <line
               x1={A.x} y1={A.y} x2={B.x} y2={B.y}
-              stroke={base} strokeWidth={opt ? 15 : 12} strokeLinecap="round"
-              opacity={show ? 0.9 : 0.5}
+              stroke={base} strokeWidth={opt ? 22 : 18} strokeLinecap="round"
+              opacity={show ? 0.92 : 0.55}
             />
             {show && (
               <>
-                <rect x={(A.x + B.x) / 2 - 20} y={(A.y + B.y) / 2 - 11} width="40" height="22" rx="7"
+                <rect x={(A.x + B.x) / 2 - 24} y={(A.y + B.y) / 2 - 13} width="48" height="26" rx="8"
                   fill="var(--panel)" stroke="var(--line)" />
-                <text x={(A.x + B.x) / 2} y={(A.y + B.y) / 2 + 5} textAnchor="middle" fontSize="12"
+                <text x={(A.x + B.x) / 2} y={(A.y + B.y) / 2 + 6} textAnchor="middle" fontSize="14"
                   fontWeight="700" fontFamily="var(--f-mono)" fill={tierColor(score.tier)}>
                   {Math.round(score.confidence * 100)}
                 </text>
@@ -82,30 +82,30 @@ export default function WarehouseFloor({ view, pathMap, onMove, onSelectShelf }:
 
       {/* junctions */}
       {Object.values(J).map((j) => (
-        <circle key={j.id} cx={j.x} cy={j.y} r="7" fill="var(--panel)" stroke="var(--ink-3)" strokeWidth="2" />
+        <circle key={j.id} cx={j.x} cy={j.y} r="10" fill="var(--panel)" stroke="var(--ink-3)" strokeWidth="2.5" />
       ))}
 
       {/* shelves */}
       {view.shelves.map((sh) => {
         const j = J[sh.near];
         if (!j) return null;
-        const x = j.x + sh.dx - 34;
-        const y = j.y + sh.dy - 20;
-        const w = 68, h = 40;
+        const w = 92, h = 52;
+        const x = j.x + Math.sign(sh.dx || 1) * 56 - w / 2;
+        const y = j.y + sh.dy - h / 2;
         const disputed = sh.stock.length > 1;
         const stCol = disputed || sh.low ? "var(--warn)" : sh.target ? "var(--accent)" : "var(--clear)";
         return (
           <g key={sh.id} className="shelf" role="button" tabIndex={0}
             onClick={() => onSelectShelf(sh.id)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelectShelf(sh.id); } }}>
-            <rect x={x} y={y} width={w} height={h} rx="6" fill="var(--rack-face)" stroke="var(--rack)" />
-            <rect x={x} y={y} width={w} height="11" rx="6" fill="var(--rack-top)" />
-            <circle cx={x + w - 11} cy={y + 21} r="5" fill={stCol}
+            <rect x={x} y={y} width={w} height={h} rx="7" fill="var(--rack-face)" stroke="var(--rack)" strokeWidth="1.5" />
+            <rect x={x} y={y} width={w} height="14" rx="7" fill="var(--rack-top)" />
+            <circle cx={x + w - 13} cy={y + 28} r="6" fill={stCol}
               className={disputed || sh.target ? "pulse" : undefined} />
-            <text x={x + 7} y={y + 26} fontSize="11" fontFamily="var(--f-mono)" fill="var(--ink)">{sh.id}</text>
+            <text x={x + 9} y={y + 34} fontSize="13" fontWeight="500" fontFamily="var(--f-mono)" fill="var(--ink)">{sh.id}</text>
             {sh.target && (
-              <text x={x + w / 2} y={y - 7} textAnchor="middle" fontSize="10" fontWeight="700"
-                letterSpacing="1" fill="var(--accent)">★ GOAL</text>
+              <text x={x + w / 2} y={y - 8} textAnchor="middle" fontSize="11" fontWeight="700"
+                letterSpacing="1.2" fill="var(--accent)">★ GOAL</text>
             )}
           </g>
         );
@@ -114,10 +114,10 @@ export default function WarehouseFloor({ view, pathMap, onMove, onSelectShelf }:
       {/* robot */}
       {J[view.position] && (
         <g className="robot-g" style={{ transform: `translate(${J[view.position].x}px, ${J[view.position].y}px)` }}>
-          <rect x="-17" y="-13" width="34" height="26" rx="7" fill="var(--robot)" />
-          <rect x="-17" y="-13" width="34" height="9" rx="7" fill="#fff" opacity="0.18" />
-          <circle cx="0" cy="0" r="4" fill="#fff" opacity="0.92" />
-          <text x="0" y="27" textAnchor="middle" fontSize="10" fontWeight="700" letterSpacing="1" fill="var(--ink-3)">AGV-1</text>
+          <rect x="-22" y="-17" width="44" height="34" rx="9" fill="var(--robot)" />
+          <rect x="-22" y="-17" width="44" height="12" rx="9" fill="#fff" opacity="0.18" />
+          <circle cx="0" cy="0" r="5" fill="#fff" opacity="0.92" />
+          <text x="0" y="34" textAnchor="middle" fontSize="11" fontWeight="700" letterSpacing="1" fill="var(--ink-3)">AGV-1</text>
         </g>
       )}
     </svg>

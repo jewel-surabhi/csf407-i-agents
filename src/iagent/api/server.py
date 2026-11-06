@@ -9,11 +9,16 @@ origins list before deploying anywhere public.
 
 from __future__ import annotations
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from iagent.api.routes import router
-from iagent.api.warehouse_routes import router as warehouse_router
+# Load .env BEFORE importing anything that reads env vars at import time, so
+# GROQ_API_KEY (and any IAGENT_* overrides) are available to the agent singleton.
+load_dotenv()
+
+from iagent.api.routes import router  # noqa: E402  (import after env load, intentional)
+from iagent.api.warehouse_routes import router as warehouse_router  # noqa: E402
 
 app = FastAPI(
     title="I, Agent API",

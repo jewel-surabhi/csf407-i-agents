@@ -1,6 +1,8 @@
 import type {
   AgentResult,
   InventoryView,
+  ProvenanceEntry,
+  ShelfContents,
   TransferResult,
   WarehouseView,
 } from "./types";
@@ -31,6 +33,16 @@ export const api = {
   inventory: (sku: string) =>
     fetch(`/api/warehouse/inventory/${encodeURIComponent(sku)}`).then(
       asJson<InventoryView>,
+    ),
+
+  bin: (shelfId: string) =>
+    fetch(`/api/warehouse/bin/${encodeURIComponent(shelfId)}`).then(
+      asJson<ShelfContents>,
+    ),
+
+  provenance: (sku: string) =>
+    fetch(`/api/warehouse/provenance/${encodeURIComponent(sku)}`).then(
+      asJson<ProvenanceEntry[]>,
     ),
 
   transfer: (sku: string, dest: string, quantity: number) =>
