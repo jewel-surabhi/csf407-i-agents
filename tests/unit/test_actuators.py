@@ -127,3 +127,71 @@ def test_act_move_forward_respects_feature_flag_still_off_when_unset():
     result = api.act_move(5)
     assert result.success is False
     assert result.reason == "actuators_disabled"
+
+
+# --- rotate --------------------------------------------------------------
+
+
+def test_act_rotate_90_clockwise_from_forward():
+    # Scenario A seeds robot.facing = "forward" (alias for "front").
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    result = api.act_rotate(90)
+
+    assert result.success is True
+    assert result.world_delta == {"robot": {"facing": "right"}}
+    assert env.world_state.robot["facing"] == "right"
+
+
+def test_act_rotate_180_flips_direction():
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    result = api.act_rotate(180)
+
+    assert result.success is True
+    assert env.world_state.robot["facing"] == "back"
+
+
+def test_act_rotate_two_90_turns_compose_to_180():
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    api.act_rotate(90)
+    api.act_rotate(90)
+
+    assert env.world_state.robot["facing"] == "back"
+
+
+def test_act_rotate_360_returns_to_original_facing():
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    api.act_rotate(360)
+
+    # 360° is a full turn → back to front.
+    assert env.world_state.robot["facing"] == "front"
+
+
+def test_act_rotate_negative_90_goes_counterclockwise():
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    result = api.act_rotate(-90)
+
+    assert result.success is True
+    # -90° clockwise == 90° counter-clockwise: front → left.
+    assert env.world_state.robot["facing"] == "left"
+
+
+def test_act_rotate_rejects_non_multiples_of_90():
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    result = api.act_rotate(45)
+
+    assert result.success is False
+    assert result.reason == "unsupported_angle:only_multiples_of_90"
+    # No mutation on failure.
+    assert env.world_state.robot["facing"] == "forward"

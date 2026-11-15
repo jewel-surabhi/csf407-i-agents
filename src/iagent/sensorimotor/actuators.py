@@ -110,10 +110,63 @@ def move_forward(
 _FAR = 10**9
 
 
+# Clockwise ordering of compass-style buckets the robot can face.
+# rotate(90) advances one step along this list, wrapping at the end.
+_DIRS_CLOCKWISE = ["front", "right", "back", "left"]
+
+# Scenario YAMLs use "forward"/"backward"; normalize to the canonical buckets.
+_FACING_ALIASES = {"forward": "front", "backward": "back"}
+
+
 def rotate(
     world_state: WorldState, degrees: int, *, observed_at: datetime
 ) -> ActionResult:
-    raise NotImplementedError("Lands in the rotate commit.")
+    """Rotate the robot in-place by `degrees` (positive = clockwise).
+
+    Only exact multiples of 90° are supported in this mock — the robot's
+    `facing` is one of {front, right, back, left}, so sub-quarter turns have
+    no meaningful bucket. `front`/`back` accept the legacy `forward`/`backward`
+    aliases coming from the scenario YAMLs.
+    """
+    params: dict[str, Any] = {"degrees": degrees}
+
+    normalized = degrees % 360
+    if normalized % 90 != 0:
+        return ActionResult(
+            action="rotate",
+            params=params,
+            success=False,
+            reason="unsupported_angle:only_multiples_of_90",
+            world_delta={},
+            observed_at=observed_at,
+        )
+
+    current = world_state.robot.get("facing", "front")
+    current = _FACING_ALIASES.get(current, current)
+    if current not in _DIRS_CLOCKWISE:
+        return ActionResult(
+            action="rotate",
+            params=params,
+            success=False,
+            reason=f"unknown_facing:{current}",
+            world_delta={},
+            observed_at=observed_at,
+        )
+
+    quarter_turns = normalized // 90
+    new_idx = (_DIRS_CLOCKWISE.index(current) + quarter_turns) % 4
+    new_facing = _DIRS_CLOCKWISE[new_idx]
+
+    world_state.robot["facing"] = new_facing
+
+    return ActionResult(
+        action="rotate",
+        params=params,
+        success=True,
+        reason=None,
+        world_delta={"robot": {"facing": new_facing}},
+        observed_at=observed_at,
+    )
 
 
 def grasp(
