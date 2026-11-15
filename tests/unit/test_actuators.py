@@ -10,7 +10,7 @@ from pathlib import Path
 
 from iagent.sensorimotor.api import SensorimotorAPI
 from iagent.sensorimotor.mock_env import MockEnvironment
-from iagent.sensorimotor.models import ActionResult
+from iagent.sensorimotor.models import ActionResult, WorldState
 
 SCENARIO_A = Path(__file__).resolve().parents[2] / "configs" / "scenario_a.yaml"
 
@@ -195,3 +195,56 @@ def test_act_rotate_rejects_non_multiples_of_90():
     assert result.reason == "unsupported_angle:only_multiples_of_90"
     # No mutation on failure.
     assert env.world_state.robot["facing"] == "forward"
+
+
+# --- grasp ---------------------------------------------------------------
+
+SCENARIO_B = SCENARIO_A.parent / "scenario_b.yaml"
+
+
+def test_act_grasp_picks_up_box_in_view_in_scenario_b():
+    # Scenario B puts box_01 in view of camera_front.
+    env = MockEnvironment.from_scenario(SCENARIO_B)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    result = api.act_grasp("box_01")
+
+    assert result.success is True
+    assert result.world_delta["robot"] == {"holding": "box_01"}
+    assert env.world_state.robot["holding"] == "box_01"
+    assert env.world_state.objects[0]["held_by"] == "robot"
+
+
+def test_act_grasp_fails_for_unknown_target():
+    env = MockEnvironment.from_scenario(SCENARIO_B)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    result = api.act_grasp("ghost_box")
+
+    assert result.success is False
+    assert result.reason == "target_not_found"
+    assert "holding" not in env.world_state.robot
+
+
+def test_act_grasp_fails_when_target_not_in_reach():
+    world = WorldState(
+        robot={"position": "room_101"},
+        objects=[{"id": "far_box"}],  # exists, but not in view of any sensor
+    )
+    api = SensorimotorAPI(MockEnvironment(world), enable_actuators=True)
+
+    result = api.act_grasp("far_box")
+
+    assert result.success is False
+    assert result.reason == "target_not_in_reach"
+
+
+def test_act_grasp_fails_when_already_holding_something():
+    env = MockEnvironment.from_scenario(SCENARIO_B)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    api.act_grasp("box_01")
+    result = api.act_grasp("box_01")
+
+    assert result.success is False
+    assert result.reason == "already_holding:box_01"

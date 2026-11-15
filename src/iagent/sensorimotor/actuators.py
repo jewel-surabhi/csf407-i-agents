@@ -172,4 +172,47 @@ def rotate(
 def grasp(
     world_state: WorldState, target_id: str, *, observed_at: datetime
 ) -> ActionResult:
-    raise NotImplementedError("Lands in the grasp commit.")
+    """Pick up the object `target_id` if it exists and is within reach.
+
+    "Within reach" in this mock means the object has an `in_view_of` entry
+    (it is in front of one of the robot's sensors). The robot can hold one
+    object at a time; on success `robot.holding` is set and the object is
+    marked `held_by: robot`.
+    """
+    params: dict[str, Any] = {"target_id": target_id}
+
+    def _fail(reason: str) -> ActionResult:
+        return ActionResult(
+            action="grasp",
+            params=params,
+            success=False,
+            reason=reason,
+            world_delta={},
+            observed_at=observed_at,
+        )
+
+    holding = world_state.robot.get("holding")
+    if holding:
+        return _fail(f"already_holding:{holding}")
+
+    target = next((o for o in world_state.objects if o.get("id") == target_id), None)
+    if target is None:
+        return _fail("target_not_found")
+
+    if not target.get("in_view_of"):
+        return _fail("target_not_in_reach")
+
+    world_state.robot["holding"] = target_id
+    target["held_by"] = "robot"
+
+    return ActionResult(
+        action="grasp",
+        params=params,
+        success=True,
+        reason=None,
+        world_delta={
+            "robot": {"holding": target_id},
+            "objects": [{"id": target_id, "held_by": "robot"}],
+        },
+        observed_at=observed_at,
+    )
