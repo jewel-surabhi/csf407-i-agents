@@ -70,6 +70,18 @@ class MaxStepsExceeded(RuntimeError):
 
 _NUDGE = "You must call a tool to continue the episode. " "Use `finalize_answer` to end."
 
+# Safety-net nudge: on the very last budgeted iteration, if no finalize has
+# happened yet, we inject this as a user message so the model knows it has one
+# last turn to close the episode. Covers the small-open-weight-model failure
+# mode documented in docs/verification_report.md §6 where the LLM burns budget
+# on self-corrections and leaves `final_answer` empty.
+_FINAL_NUDGE = (
+    "LAST TURN — you have exhausted your step budget. Call `finalize_answer` "
+    "RIGHT NOW with the best answer the evidence you have already gathered "
+    "supports. Do not call any other tool. If you have no evidence, finalize "
+    "with 'I don't know' and explain why briefly."
+)
+
 _DUPLICATE_FINALIZE = {
     "ok": False,
     "error": {
@@ -128,6 +140,13 @@ def run_react(
             max_messages=max_context_messages,
             token_budget=token_budget,
         )
+        # Auto-finalize safety net (verification report §7.2): on the final
+        # budgeted turn with no finalize yet, inject a strong nudge so the
+        # model knows this is its last chance to close the episode. Keeps the
+        # small open-weight LLM from leaving final_answer empty after burning
+        # its budget on self-corrections.
+        if step_idx == max_steps and not trace.final_answer:
+            messages.append({"role": "user", "content": _FINAL_NUDGE})
         response: AssistantResponse = agent.llm.chat_with_tools(messages, specs)
 
         if not response.tool_calls:

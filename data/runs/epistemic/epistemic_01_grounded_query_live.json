@@ -23,7 +23,7 @@
           "source": "default_map",
           "perspective": "self",
           "status": "active",
-          "observed_at": "2026-11-06T13:12:40.362780Z",
+          "observed_at": "2026-11-15T08:57:54.530377Z",
           "provenance_id": 1
         }
       },
@@ -56,10 +56,10 @@
     }
   ],
   "final_answer": "I am in room_101.",
-  "started_at": "2026-11-06T13:12:41.865807Z",
-  "ended_at": "2026-11-06T13:12:43.495873Z",
+  "started_at": "2026-11-15T08:57:55.919508Z",
+  "ended_at": "2026-11-15T08:57:57.261623Z",
   "test_id": "01_grounded_query",
-  "recorded_at": "2026-11-06T13:12:43.500066+00:00",
+  "recorded_at": "2026-11-15T08:57:57.263125+00:00",
   "mode": "live",
   "extras": {
     "scenario": "scenario_a",

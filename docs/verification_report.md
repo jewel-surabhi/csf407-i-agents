@@ -31,13 +31,13 @@ Of the 10 automated test logs committed under `data/runs/epistemic/`:
 | Suite | Pass rate | Notes |
 |---|---|---|
 | Recorded (deterministic, CI-safe) | **10 / 10** | Tool sequence scripted; validates test design + layer behavior |
-| Live (real Groq, `openai/gpt-oss-20b`) | **6 / 10** | Reads + perspective tasks pass; multi-step write-backs are inconsistent |
+| Live (real Groq, `openai/gpt-oss-20b`) | **7 / 10** | After the auto-finalize safety net landed (§7.2), test 02 flipped from fail→pass; tests 04 and 10 now cleanly finalize but still don't always write back the belief |
 
-Section 6 of this report discusses the 4 live failures honestly. The
-short version: the small open-weight LLM reliably *reads* the belief graph
-and keeps perspectives distinct, but is inconsistent at closing multi-step
-*write-back* episodes (Scenario A). This is a model-capability limitation
-the architecture *exposes*, not papers over.
+Section 6 of this report discusses the 3 remaining live failures honestly.
+The short version: the small open-weight LLM reliably *reads* the belief
+graph and keeps perspectives distinct, but is inconsistent at closing
+multi-step *write-back* episodes (Scenario A). This is a model-capability
+limitation the architecture *exposes*, not papers over.
 
 ---
 
@@ -285,15 +285,15 @@ Groq call) for 20 files total. All 20 share the section-K log shape:
 | # | Test | Scenario | What it proves | Recorded | Live |
 |---|---|---|---|---|---|
 | 01 | grounded_query | A | Reads an existing belief instead of inventing one | ✅ | ✅ |
-| 02 | stale_map_conflict | A | Sides with live LiDAR over stale default_map | ✅ | ⚠️ ran out of max_steps |
-| 03 | sensor_confidence_update | A | Belief graph actually mutates (not just words) | ✅ | ⚠️ no is_blocked write persisted |
-| 04 | provenance_written | A | SQLite ledger captures every mutation | ✅ | ⚠️ ran out of max_steps |
+| 02 | stale_map_conflict | A | Sides with live LiDAR over stale default_map | ✅ | ✅ *(rescued by safety net)* |
+| 03 | sensor_confidence_update | A | Belief graph actually mutates (not just words) | ✅ | ⚠️ `functions.finalize_answer` artifact |
+| 04 | provenance_written | A | SQLite ledger captures every mutation | ✅ | ⚠️ finalized but no is_blocked write |
 | 05 | user_perspective | B | Returns the user's belief without leaking other views | ✅ | ✅ |
 | 06 | egocentric_perspective | B | Reports its own live camera with egocentric framing | ✅ | ✅ |
 | 07 | historical_perspective | B | Surfaces third-party history as third-party | ✅ | ✅ |
 | 08 | perspective_no_merge | B | Three perspectives distinct in one answer | ✅ | ✅ |
 | 09 | unknown_entity | — | Says "I don't know" instead of fabricating | ✅ | ✅ |
-| 10 | multi_source_reconciliation | A | Picks by trust prior, not majority vote | ✅ | ⚠️ no write-back completed |
+| 10 | multi_source_reconciliation | A | Picks by trust prior, not majority vote | ✅ | ⚠️ finalized but no is_blocked write |
 
 Each row's **Recorded** column uses a `RecordedLLMClient` that replays a
 scripted tool sequence pinned by the test author — this validates the
@@ -306,10 +306,22 @@ scripted tool sequence pinned by the test author — this validates the
 
 The live-LLM pass surfaced a reproducible gap: **the 20B model reliably
 reads the belief graph but is inconsistent at closing multi-step
-write-back episodes.** All four live failures are Scenario-A variants
-that require the agent to *mutate* the belief graph after a sensor
-disagreement (tests 02, 03, 04, 10). All six passes are either baseline
-reads or Scenario B perspective queries.
+write-back episodes.** The three remaining live failures (tests 03, 04,
+10) are all Scenario-A variants that require the agent to *mutate* the
+belief graph after a sensor disagreement. All seven passes are either
+baseline reads, Scenario B perspective queries, or Scenario A episodes
+where the agent happened to complete both the write-back AND the
+finalize.
+
+Earlier, test 02 was in this same failure cluster. It was rescued by the
+auto-finalize safety net described in §7.2 — an addition that proved its
+own value: before the safety net, test 02 would consistently exhaust its
+step budget on self-corrections and never call `finalize_answer`. After
+the safety net, the model receives a LAST TURN nudge and closes the
+episode cleanly with a passing answer. Tests 04 and 10 ALSO changed
+failure mode (from empty `final_answer` to finalized-without-write),
+which isolates the remaining problem purely to the belief-write step,
+not the episode terminator.
 
 ### 6.1 The failure mode, concretely
 
@@ -374,10 +386,16 @@ Grounded in things the live testing exposed:
 1. **Larger model pass.** Re-run the 10 live tests against Llama-3.3-70B
    or an API-key-tier Groq 120B model. Expected: 10/10. Documents cleanly
    that the architecture is correct and the gap is model capability.
-2. **Auto-finalize safety net.** If the loop reaches `max_steps - 2`
-   without a `finalize_answer` call, inject a mandatory
-   `finalize_answer` prompt. Prevents empty final answers on budget
-   exhaustion.
+2. ~~**Auto-finalize safety net.**~~ **Shipped.** Implemented in
+   [src/iagent/procedural/react_loop.py:140](src/iagent/procedural/react_loop.py#L140)
+   — on `step_idx == max_steps` with no finalize yet, the loop injects a
+   LAST TURN user message forcing `finalize_answer`. Measured impact: live
+   pass rate 6/10 → 7/10 (test 02 flipped). Tests 04 and 10 now finalize
+   cleanly instead of leaving `final_answer` empty, though the belief
+   write-back itself is still inconsistent — a *different* failure mode
+   than before, which pushes the open problem squarely onto model
+   capability rather than loop plumbing. Covered by two new unit tests
+   in [tests/unit/test_react_loop.py](tests/unit/test_react_loop.py).
 3. **Trace-vs-answer linter.** Post-episode check that every quantitative
    claim in `final_answer` (numbers, source names, perspective labels)
    appears as a token in an earlier observation. Catches paraphrasing

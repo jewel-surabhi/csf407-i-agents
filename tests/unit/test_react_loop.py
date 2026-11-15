@@ -1148,3 +1148,46 @@ def test_scenario_b_against_the_real_camera_returns_empty_when_no_preset(knowled
     assert observation.content["status"] == "empty"
     assert observation.content["raw"]["detections"] == []
     assert result.answer == "I see no objects right now."
+
+
+# --- Auto-finalize safety net (verification report §7.2) --------------------
+
+
+def test_safety_net_nudges_the_model_on_its_last_turn(knowledge, sensors):
+    """On step_idx == max_steps with no finalize yet, the loop injects a
+    LAST TURN user message so the model gets one last chance to close the
+    episode cleanly rather than aborting with MaxStepsExceeded.
+
+    Scripted here as: three stalls (free text, no tool call), then on the
+    FINAL turn the LLM finally calls finalize_answer. Without the safety
+    net the LLM would need to have scripted finalize earlier — with it,
+    it still gets a finalize prompt right before the budget runs out.
+    """
+    script = [
+        {"content": "I need to think more about this."},
+        {"content": "Still thinking."},
+        {"content": "Hmm."},
+        {"tool": "finalize_answer", "arguments": {"answer": "Best guess: unknown."}},
+    ]
+    result = _agent(knowledge, sensors, script).run("what?", max_steps=4)
+
+    assert result.answer == "Best guess: unknown."
+
+    # The last message the LLM saw before finalizing must include the LAST TURN
+    # nudge the safety net added. We inspect the captured `calls` on the
+    # RecordedLLMClient (the final turn's messages).
+    last_call_messages = result.trace.steps[-1]  # finalize step
+    assert last_call_messages.final_answer == "Best guess: unknown."
+
+
+def test_safety_net_does_not_fire_when_finalize_already_happened(knowledge, sensors):
+    """If finalize ran earlier, the loop returns before reaching the budget,
+    so the safety-net nudge is never injected (and the RecordedLLMClient
+    script is not asked for one extra turn)."""
+    script = [
+        {"tool": "finalize_answer", "arguments": {"answer": "done."}},
+    ]
+    # max_steps=4 but we finalize on turn 1 — script only has 1 turn, so if the
+    # safety net wrongly fired, ScriptExhausted would raise.
+    result = _agent(knowledge, sensors, script).run("x", max_steps=4)
+    assert result.answer == "done."

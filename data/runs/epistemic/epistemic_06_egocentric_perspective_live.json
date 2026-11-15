@@ -45,22 +45,16 @@
       "idx": 2,
       "thought": null,
       "tool_call": {
-        "name": "functions.finalize_answer",
+        "name": "get_belief",
         "arguments": {
-          "answer": "From my front camera, I currently perceive box_01 as brown. The ambient lighting is yellow, and the system notes that color perception may be unreliable under these conditions.",
-          "cited_beliefs": [],
-          "cited_sensors": [
-            "sense_camera"
-          ]
+          "predicate": "has_color",
+          "subject": "box_01"
         }
       },
       "observation": {
-        "tool": "functions.finalize_answer",
-        "ok": false,
-        "content": {
-          "kind": "unknown_tool",
-          "message": "No tool named 'functions.finalize_answer'."
-        }
+        "tool": "get_belief",
+        "ok": true,
+        "content": {}
       },
       "final_answer": null
     },
@@ -70,10 +64,10 @@
       "tool_call": {
         "name": "finalize_answer",
         "arguments": {
-          "answer": "From my front camera, I currently perceive box_01 as brown. The ambient lighting is yellow, and the system notes that color perception may be unreliable under these conditions.",
+          "answer": "I see box_01 as brown. The ambient lighting is yellow, and the camera reports that color perception may be unreliable under these conditions.",
           "cited_beliefs": [],
           "cited_sensors": [
-            "sense_camera"
+            "camera_front"
           ]
         }
       },
@@ -81,21 +75,21 @@
         "tool": "finalize_answer",
         "ok": true,
         "content": {
-          "answer": "From my front camera, I currently perceive box_01 as brown. The ambient lighting is yellow, and the system notes that color perception may be unreliable under these conditions.",
+          "answer": "I see box_01 as brown. The ambient lighting is yellow, and the camera reports that color perception may be unreliable under these conditions.",
           "cited_beliefs": [],
           "cited_sensors": [
-            "sense_camera"
+            "camera_front"
           ]
         }
       },
-      "final_answer": "From my front camera, I currently perceive box_01 as brown. The ambient lighting is yellow, and the system notes that color perception may be unreliable under these conditions."
+      "final_answer": "I see box_01 as brown. The ambient lighting is yellow, and the camera reports that color perception may be unreliable under these conditions."
     }
   ],
-  "final_answer": "From my front camera, I currently perceive box_01 as brown. The ambient lighting is yellow, and the system notes that color perception may be unreliable under these conditions.",
-  "started_at": "2026-11-06T13:19:59.144987Z",
-  "ended_at": "2026-11-06T13:20:34.535874Z",
+  "final_answer": "I see box_01 as brown. The ambient lighting is yellow, and the camera reports that color perception may be unreliable under these conditions.",
+  "started_at": "2026-11-15T09:03:59.331595Z",
+  "ended_at": "2026-11-15T09:04:28.330519Z",
   "test_id": "06_egocentric_perspective",
-  "recorded_at": "2026-11-06T13:20:34.538904+00:00",
+  "recorded_at": "2026-11-15T09:04:28.331666+00:00",
   "mode": "live",
   "extras": {
     "scenario": "scenario_b",
