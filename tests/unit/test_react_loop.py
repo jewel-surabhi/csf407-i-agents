@@ -734,8 +734,8 @@ def test_actuator_call_is_refused_in_the_loop_by_default(knowledge, sensors):
 
 
 def test_enabling_actuators_in_config_opens_the_gate(knowledge, sensors):
-    """With the flag on, the call reaches P2's facade -- which currently
-    returns `not_implemented` rather than being refused outright."""
+    """With the flag on, the call reaches P2's facade and comes back as a
+    real ActionResult (Scenario A's crate at 12cm blocks a 30cm move)."""
     script = [
         {"tool": "act_move", "arguments": {"distance_cm": 30}},
         {"tool": "finalize_answer", "arguments": {"answer": "tried to move"}},
@@ -749,8 +749,10 @@ def test_enabling_actuators_in_config_opens_the_gate(knowledge, sensors):
     result = agent.run("x")
 
     observation = result.trace.steps[0].observation
-    assert observation.ok is False
-    assert observation.content["kind"] == "not_implemented"
+    assert observation.ok is True
+    assert observation.content["action"] == "move"
+    assert observation.content["success"] is False
+    assert observation.content["reason"] == "blocked_by:crate_A"
 
 
 def test_actuator_specs_reach_the_llm_only_when_enabled(knowledge, sensors):
