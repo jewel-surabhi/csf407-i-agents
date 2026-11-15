@@ -1,10 +1,9 @@
 """Actuators mutate world state and return ActionResult.
 
-Disabled by default (`SensorimotorAPI(enable_actuators=False)`) so the
-epistemic test suite stays deterministic. Individual actuators are added
-per-commit (move_forward → rotate → grasp); the uniform `disabled_result`
-helper gives the façade a well-shaped response for every flag-off call.
-Owner: Person 2 (Phase 3).
+`move_forward`, `rotate` and `grasp` never raise: a refused action comes back
+as `success=False` with a `reason`, and the world is left unchanged.
+`disabled_result` is the response the façade gives when it was built with
+`enable_actuators=False`. Owner: Person 2 (Phase 3).
 """
 
 from __future__ import annotations
@@ -67,8 +66,7 @@ def move_forward(
     blockers = [
         o
         for o in world_state.obstacles
-        if o.get("in_front_of") == "robot"
-        and int(o.get("distance_cm", _FAR)) <= distance_cm
+        if o.get("in_front_of") == "robot" and int(o.get("distance_cm", _FAR)) <= distance_cm
     ]
     if blockers:
         nearest = min(blockers, key=lambda o: int(o.get("distance_cm", _FAR)))
@@ -88,9 +86,7 @@ def move_forward(
             o["distance_cm"] = int(o.get("distance_cm", _FAR)) - distance_cm
             moved_obstacles.append({"id": o.get("id"), "distance_cm": o["distance_cm"]})
 
-    world_state.robot["traveled_cm"] = (
-        int(world_state.robot.get("traveled_cm", 0)) + distance_cm
-    )
+    world_state.robot["traveled_cm"] = int(world_state.robot.get("traveled_cm", 0)) + distance_cm
 
     return ActionResult(
         action="move",
@@ -118,9 +114,7 @@ _DIRS_CLOCKWISE = ["front", "right", "back", "left"]
 _FACING_ALIASES = {"forward": "front", "backward": "back"}
 
 
-def rotate(
-    world_state: WorldState, degrees: int, *, observed_at: datetime
-) -> ActionResult:
+def rotate(world_state: WorldState, degrees: int, *, observed_at: datetime) -> ActionResult:
     """Rotate the robot in-place by `degrees` (positive = clockwise).
 
     Only exact multiples of 90° are supported in this mock — the robot's
@@ -158,6 +152,7 @@ def rotate(
     new_facing = _DIRS_CLOCKWISE[new_idx]
 
     world_state.robot["facing"] = new_facing
+    _reorient_obstacles(world_state.obstacles, quarter_turns)
 
     return ActionResult(
         action="rotate",
@@ -169,9 +164,7 @@ def rotate(
     )
 
 
-def grasp(
-    world_state: WorldState, target_id: str, *, observed_at: datetime
-) -> ActionResult:
+def grasp(world_state: WorldState, target_id: str, *, observed_at: datetime) -> ActionResult:
     """Pick up the object `target_id` if it exists and is within reach.
 
     "Within reach" in this mock means the object has an `in_view_of` entry
@@ -216,3 +209,30 @@ def grasp(
         },
         observed_at=observed_at,
     )
+
+
+# After one clockwise quarter turn, whatever was in front of the robot is now
+# on its left, what was on its left is behind it, and so on.
+_RELATIVE_AFTER_CLOCKWISE_TURN = {
+    "in_front_of": "in_left_of",
+    "in_left_of": "in_back_of",
+    "in_back_of": "in_right_of",
+    "in_right_of": "in_front_of",
+}
+
+
+def _reorient_obstacles(obstacles: list[dict[str, Any]], quarter_turns: int) -> None:
+    """Re-label each obstacle's robot-relative direction after a rotation.
+
+    Without this, `sense_lidar("front")` would keep reporting an obstacle the
+    robot has already turned away from.
+    """
+    for _ in range(quarter_turns):
+        for o in obstacles:
+            for key, turned in _RELATIVE_AFTER_CLOCKWISE_TURN.items():
+                if o.get(key) == "robot":
+                    del o[key]
+                    o[turned] = "robot"
+                    break
+
+                

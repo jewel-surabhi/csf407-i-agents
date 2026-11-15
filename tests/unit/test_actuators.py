@@ -18,8 +18,8 @@ SCENARIO_A = Path(__file__).resolve().parents[2] / "configs" / "scenario_a.yaml"
 # --- feature flag --------------------------------------------------------
 
 
-def test_actuators_disabled_by_default_act_move():
-    api = SensorimotorAPI(MockEnvironment.from_scenario(SCENARIO_A))
+def test_actuators_disabled_act_move():
+    api = SensorimotorAPI(MockEnvironment.from_scenario(SCENARIO_A), enable_actuators=False)
 
     result = api.act_move(10, direction="forward")
 
@@ -31,8 +31,8 @@ def test_actuators_disabled_by_default_act_move():
     assert result.world_delta == {}
 
 
-def test_actuators_disabled_by_default_act_rotate():
-    api = SensorimotorAPI(MockEnvironment.from_scenario(SCENARIO_A))
+def test_actuators_disabled_act_rotate():
+    api = SensorimotorAPI(MockEnvironment.from_scenario(SCENARIO_A), enable_actuators=False)
 
     result = api.act_rotate(90)
 
@@ -42,8 +42,8 @@ def test_actuators_disabled_by_default_act_rotate():
     assert result.params == {"degrees": 90}
 
 
-def test_actuators_disabled_by_default_act_grasp():
-    api = SensorimotorAPI(MockEnvironment.from_scenario(SCENARIO_A))
+def test_actuators_disabled_act_grasp():
+    api = SensorimotorAPI(MockEnvironment.from_scenario(SCENARIO_A), enable_actuators=False)
 
     result = api.act_grasp("box_01")
 
@@ -55,7 +55,7 @@ def test_actuators_disabled_by_default_act_grasp():
 
 def test_disabled_response_does_not_mutate_world():
     env = MockEnvironment.from_scenario(SCENARIO_A)
-    api = SensorimotorAPI(env)
+    api = SensorimotorAPI(env, enable_actuators=False)
     before = env.describe()
 
     api.act_move(100)
@@ -121,12 +121,12 @@ def test_act_move_zero_distance_is_a_successful_no_op():
     assert env.world_state.obstacles[0]["distance_cm"] == 12
 
 
-def test_act_move_forward_respects_feature_flag_still_off_when_unset():
-    # Sanity check that Day 2's wiring did not accidentally flip the default.
-    api = SensorimotorAPI(MockEnvironment.from_scenario(SCENARIO_A))
+def test_actuators_run_by_default():
+    # The config gate lives in the procedural dispatcher; the facade itself
+    # runs an actuator when it is called.
+    api = SensorimotorAPI(MockEnvironment())
     result = api.act_move(5)
-    assert result.success is False
-    assert result.reason == "actuators_disabled"
+    assert result.success is True
 
 
 # --- rotate --------------------------------------------------------------
@@ -248,3 +248,64 @@ def test_act_grasp_fails_when_already_holding_something():
 
     assert result.success is False
     assert result.reason == "already_holding:box_01"
+
+
+# --- end-to-end: actuators change what the sensors report ----------------
+
+
+def test_rotating_away_from_obstacle_clears_front_lidar():
+    # Scenario A: crate_A is 12cm in front. After a half turn it is behind.
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    api.act_rotate(180)
+
+    assert api.sense_lidar("front").status == "clear"
+    back = api.sense_lidar("back")
+    assert back.status == "blocked"
+    assert back.value == 12
+    assert back.raw["obstacle_id"] == "crate_A"
+
+
+def test_move_succeeds_after_turning_away_from_obstacle():
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    assert api.act_move(20).success is False  # crate in the way
+    api.act_rotate(180)
+    assert api.act_move(20).success is True  # crate is now behind
+
+
+def test_full_turn_leaves_obstacle_in_front():
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    api.act_rotate(360)
+
+    front = api.sense_lidar("front")
+    assert front.status == "blocked"
+    assert front.value == 12
+
+
+def test_move_then_rotate_then_sense_sequence():
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    api.act_move(5)  # crate now 7cm ahead
+    api.act_rotate(90)  # turn right: crate ends up on the left
+
+    assert api.sense_lidar("front").status == "clear"
+    left = api.sense_lidar("left")
+    assert left.value == 7
+    assert left.raw["obstacle_id"] == "crate_A"
+
+
+def test_act_move_backward_is_refused_without_moving():
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    api = SensorimotorAPI(env, enable_actuators=True)
+
+    result = api.act_move(5, direction="backward")
+
+    assert result.success is False
+    assert result.reason == "unsupported_direction:backward"
+    assert env.world_state.obstacles[0]["distance_cm"] == 12

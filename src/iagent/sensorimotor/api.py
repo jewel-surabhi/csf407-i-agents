@@ -3,9 +3,13 @@
 Signatures were frozen at end of Phase 1 (see PROJECT_PLAN.md section G.2).
 Owner: Person 2 (Phase 3).
 
-Only `sense_lidar` is implemented in this pass — Scenario A only needs the
-LiDAR. Camera, clock and actuators still raise `NotImplementedError` and land
-in later commits.
+Sensors (`sense_lidar`, `sense_camera`, `sense_clock`) are always available.
+Actuators (`act_move`, `act_rotate`, `act_grasp`) run when called. Whether the
+LLM may call them at all is decided by `features.enable_actuators` in the
+procedural dispatcher (off by default, so the epistemic tests stay
+deterministic). Building the API with `enable_actuators=False` is an extra
+hard switch: every act_* call then returns `success=False,
+reason="actuators_disabled"` and changes nothing.
 """
 
 from __future__ import annotations
@@ -22,16 +26,15 @@ __all__ = ["SensorimotorAPI", "SensorPayload", "ActionResult"]
 class SensorimotorAPI:
     """Facade wrapping a `MockEnvironment`.
 
-    `enable_actuators` is OFF by default so the 10 epistemic tests stay
-    deterministic — any act_* call returns a well-shaped "disabled" response.
-    Tests / scenarios that need real actuators pass `enable_actuators=True`.
+    Pass `enable_actuators=False` to hard-disable the act_* methods; they then
+    return a well-shaped "disabled" response instead of touching the world.
     """
 
     def __init__(
         self,
         env: MockEnvironment | None = None,
         *,
-        enable_actuators: bool = False,
+        enable_actuators: bool = True,
     ) -> None:
         self._env: MockEnvironment = env or MockEnvironment()
         self._enable_actuators: bool = enable_actuators
@@ -42,9 +45,7 @@ class SensorimotorAPI:
         self,
         direction: Literal["front", "left", "right", "back"] = "front",
     ) -> SensorPayload:
-        return sensors.read_lidar(
-            self._env.world_state, direction, observed_at=self._env.now
-        )
+        return sensors.read_lidar(self._env.world_state, direction, observed_at=self._env.now)
 
     def sense_camera(
         self,
@@ -69,33 +70,30 @@ class SensorimotorAPI:
     ) -> ActionResult:
         params = {"distance_cm": distance_cm, "direction": direction}
         if not self._enable_actuators:
-            return actuators.disabled_result(
-                "move", params, observed_at=self._env.now
+            return actuators.disabled_result("move", params, observed_at=self._env.now)
+        if direction != "forward":
+            # Only forward motion is modelled; refuse instead of moving the wrong way.
+            return ActionResult(
+                action="move",
+                params=params,
+                success=False,
+                reason=f"unsupported_direction:{direction}",
+                world_delta={},
+                observed_at=self._env.now,
             )
-        # Real implementations land per-actuator in follow-up commits.
-        return actuators.move_forward(
-            self._env.world_state, distance_cm, observed_at=self._env.now
-        )
+        return actuators.move_forward(self._env.world_state, distance_cm, observed_at=self._env.now)
 
     def act_rotate(self, degrees: int) -> ActionResult:
         params = {"degrees": degrees}
         if not self._enable_actuators:
-            return actuators.disabled_result(
-                "rotate", params, observed_at=self._env.now
-            )
-        return actuators.rotate(
-            self._env.world_state, degrees, observed_at=self._env.now
-        )
+            return actuators.disabled_result("rotate", params, observed_at=self._env.now)
+        return actuators.rotate(self._env.world_state, degrees, observed_at=self._env.now)
 
     def act_grasp(self, target_id: str) -> ActionResult:
         params = {"target_id": target_id}
         if not self._enable_actuators:
-            return actuators.disabled_result(
-                "grasp", params, observed_at=self._env.now
-            )
-        return actuators.grasp(
-            self._env.world_state, target_id, observed_at=self._env.now
-        )
+            return actuators.disabled_result("grasp", params, observed_at=self._env.now)
+        return actuators.grasp(self._env.world_state, target_id, observed_at=self._env.now)
 
     # ---------- debug (never exposed to the LLM) ----------
 
