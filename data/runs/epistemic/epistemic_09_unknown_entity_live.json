@@ -102,10 +102,10 @@
     }
   ],
   "final_answer": "I don't know.",
-  "started_at": "2026-11-06T13:21:56.168461Z",
-  "ended_at": "2026-11-06T13:22:41.694570Z",
+  "started_at": "2026-11-15T09:05:09.802617Z",
+  "ended_at": "2026-11-15T09:05:40.995158Z",
   "test_id": "09_unknown_entity",
-  "recorded_at": "2026-11-06T13:22:41.695694+00:00",
+  "recorded_at": "2026-11-15T09:05:40.996234+00:00",
   "mode": "live",
   "extras": {
     "scenario": "scenario_a",

@@ -6,6 +6,33 @@
       "idx": 1,
       "thought": null,
       "tool_call": {
+        "name": "get_belief",
+        "arguments": {
+          "predicate": "is_clear",
+          "subject": "path_ahead"
+        }
+      },
+      "observation": {
+        "tool": "get_belief",
+        "ok": true,
+        "content": {
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 1.0,
+          "source": "default_map",
+          "perspective": "self",
+          "status": "active",
+          "observed_at": "2026-11-15T08:59:42.665007Z",
+          "provenance_id": 2
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 2,
+      "thought": null,
+      "tool_call": {
         "name": "sense_lidar",
         "arguments": {
           "direction": "front"
@@ -33,33 +60,6 @@
       "final_answer": null
     },
     {
-      "idx": 2,
-      "thought": null,
-      "tool_call": {
-        "name": "get_belief",
-        "arguments": {
-          "predicate": "is_clear",
-          "subject": "path_ahead"
-        }
-      },
-      "observation": {
-        "tool": "get_belief",
-        "ok": true,
-        "content": {
-          "subject": "path_ahead",
-          "predicate": "is_clear",
-          "object": "true",
-          "confidence": 1.0,
-          "source": "default_map",
-          "perspective": "self",
-          "status": "active",
-          "observed_at": "2026-11-06T13:29:28.823695Z",
-          "provenance_id": 2
-        }
-      },
-      "final_answer": null
-    },
-    {
       "idx": 3,
       "thought": "SELF-CORRECTION: my previous tool call was rejected by the runtime (invalid tool name or malformed JSON arguments). I will call a listed tool with well-formed arguments next.",
       "tool_call": null,
@@ -70,8 +70,152 @@
       "idx": 4,
       "thought": null,
       "tool_call": {
+        "name": "downgrade_belief",
+        "arguments": {
+          "new_confidence": 0.2,
+          "perspective": "self",
+          "predicate": "is_clear",
+          "reason": "conflict with lidar_front",
+          "subject": "path_ahead"
+        }
+      },
+      "observation": {
+        "tool": "downgrade_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 3,
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 0.2,
+          "source_id": "default_map",
+          "perspective": "self",
+          "observed_at": "2026-11-15T08:59:42.665007Z",
+          "recorded_at": "2026-11-15T09:00:36",
+          "status": "downgraded",
+          "payload": {
+            "reason": "conflict with lidar_front",
+            "supersedes": 2
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 5,
+      "thought": null,
+      "tool_call": {
+        "name": "update_belief",
+        "arguments": {
+          "confidence": 0.95,
+          "object": "true",
+          "perspective": "self",
+          "predicate": "is_clear",
+          "reason": "lidar_front indicates obstacle",
+          "source": "lidar_front",
+          "subject": "path_ahead"
+        }
+      },
+      "observation": {
+        "tool": "update_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 4,
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "true",
+          "confidence": 0.95,
+          "source_id": "lidar_front",
+          "perspective": "self",
+          "observed_at": "2026-11-15T09:00:53.063385Z",
+          "recorded_at": "2026-11-15T09:00:53",
+          "status": "active",
+          "payload": {
+            "reason": "lidar_front indicates obstacle"
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 6,
+      "thought": null,
+      "tool_call": {
+        "name": "update_belief",
+        "arguments": {
+          "confidence": 0.95,
+          "object": "false",
+          "perspective": "self",
+          "predicate": "is_clear",
+          "reason": "lidar_front indicates obstacle",
+          "source": "lidar_front",
+          "subject": "path_ahead"
+        }
+      },
+      "observation": {
+        "tool": "update_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 5,
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "false",
+          "confidence": 0.95,
+          "source_id": "lidar_front",
+          "perspective": "self",
+          "observed_at": "2026-11-15T09:01:00.769535Z",
+          "recorded_at": "2026-11-15T09:01:00",
+          "status": "active",
+          "payload": {
+            "reason": "lidar_front indicates obstacle"
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 7,
+      "thought": null,
+      "tool_call": {
+        "name": "downgrade_belief",
+        "arguments": {
+          "new_confidence": 0.1,
+          "perspective": "self",
+          "predicate": "is_clear",
+          "reason": "incorrect value",
+          "subject": "path_ahead"
+        }
+      },
+      "observation": {
+        "tool": "downgrade_belief",
+        "ok": true,
+        "content": {
+          "provenance_id": 6,
+          "subject": "path_ahead",
+          "predicate": "is_clear",
+          "object": "false",
+          "confidence": 0.1,
+          "source_id": "lidar_front",
+          "perspective": "self",
+          "observed_at": "2026-11-15T09:01:00.769535Z",
+          "recorded_at": "2026-11-15T09:01:10",
+          "status": "downgraded",
+          "payload": {
+            "reason": "incorrect value",
+            "supersedes": 5
+          }
+        }
+      },
+      "final_answer": null
+    },
+    {
+      "idx": 8,
+      "thought": null,
+      "tool_call": {
         "name": "list_sources",
-        "arguments": {}
+        "arguments": {
+          "": ""
+        }
       },
       "observation": {
         "tool": "list_sources",
@@ -120,7 +264,7 @@
       "final_answer": null
     },
     {
-      "idx": 5,
+      "idx": 9,
       "thought": null,
       "tool_call": {
         "name": "downgrade_belief",
@@ -128,106 +272,51 @@
           "new_confidence": 0.1,
           "perspective": "self",
           "predicate": "is_clear",
-          "reason": "LiDAR indicates obstacle",
+          "reason": "incorrect value",
           "subject": "path_ahead"
         }
       },
       "observation": {
         "tool": "downgrade_belief",
-        "ok": true,
+        "ok": false,
         "content": {
-          "provenance_id": 3,
-          "subject": "path_ahead",
-          "predicate": "is_clear",
-          "object": "true",
-          "confidence": 0.1,
-          "source_id": "default_map",
-          "perspective": "self",
-          "observed_at": "2026-11-06T13:29:28.823695Z",
-          "recorded_at": "2026-11-06T13:30:22",
-          "status": "downgraded",
-          "payload": {
-            "reason": "LiDAR indicates obstacle",
-            "supersedes": 2
-          }
+          "kind": "knowledge_error",
+          "message": "no active belief to downgrade: ('path_ahead', 'is_clear', 'self')"
         }
       },
       "final_answer": null
     },
     {
-      "idx": 6,
+      "idx": 10,
       "thought": null,
       "tool_call": {
-        "name": "update_belief",
+        "name": "functions.finalize_answer",
         "arguments": {
-          "confidence": 0.95,
-          "object": "path_ahead",
-          "perspective": "self",
-          "predicate": "is_clear",
-          "reason": "Front LiDAR detected obstacle at 12 cm",
-          "source": "lidar_front",
-          "subject": "path_ahead"
+          "answer": "The front LiDAR reports an obstacle 12\u202fcm ahead, so the path ahead is not clear.",
+          "cited_beliefs": [
+            "provenance_id 5"
+          ],
+          "cited_sensors": [
+            "lidar_front"
+          ]
         }
       },
       "observation": {
-        "tool": "update_belief",
-        "ok": true,
+        "tool": "functions.finalize_answer",
+        "ok": false,
         "content": {
-          "provenance_id": 4,
-          "subject": "path_ahead",
-          "predicate": "is_clear",
-          "object": "path_ahead",
-          "confidence": 0.95,
-          "source_id": "lidar_front",
-          "perspective": "self",
-          "observed_at": "2026-11-06T13:30:46.181717Z",
-          "recorded_at": "2026-11-06T13:30:46",
-          "status": "active",
-          "payload": {
-            "reason": "Front LiDAR detected obstacle at 12 cm"
-          }
+          "kind": "unknown_tool",
+          "message": "No tool named 'functions.finalize_answer'."
         }
       },
       "final_answer": null
-    },
-    {
-      "idx": 7,
-      "thought": null,
-      "tool_call": {
-        "name": "finalize_answer",
-        "arguments": {
-          "answer": "The front LiDAR detected an obstacle at 12\u202fcm, so the path ahead is not clear. I downgraded the previous belief (provenance_id\u202f3) and added a new belief (provenance_id\u202f4) that path_ahead.is_clear is false with 0.95 confidence.",
-          "cited_beliefs": [
-            "3",
-            "4"
-          ],
-          "cited_sensors": [
-            "sense_lidar"
-          ]
-        }
-      },
-      "observation": {
-        "tool": "finalize_answer",
-        "ok": true,
-        "content": {
-          "answer": "The front LiDAR detected an obstacle at 12\u202fcm, so the path ahead is not clear. I downgraded the previous belief (provenance_id\u202f3) and added a new belief (provenance_id\u202f4) that path_ahead.is_clear is false with 0.95 confidence.",
-          "cited_beliefs": [
-            "3",
-            "4"
-          ],
-          "cited_sensors": [
-            "sense_lidar"
-          ]
-        }
-      },
-      "final_answer": "The front LiDAR detected an obstacle at 12\u202fcm, so the path ahead is not clear. I downgraded the previous belief (provenance_id\u202f3) and added a new belief (provenance_id\u202f4) that path_ahead.is_clear is false with 0.95 confidence."
     }
   ],
-  "final_answer": "The front LiDAR detected an obstacle at 12\u202fcm, so the path ahead is not clear. I downgraded the previous belief (provenance_id\u202f3) and added a new belief (provenance_id\u202f4) that path_ahead.is_clear is false with 0.95 confidence.",
-  "started_at": "2026-11-06T13:29:29.745122Z",
-  "ended_at": "2026-11-06T13:31:05.226857Z",
+  "final_answer": "",
+  "started_at": "2026-11-15T08:59:44.124010Z",
+  "ended_at": "2026-11-15T09:02:21.961454Z",
   "test_id": "03_sensor_confidence_update",
-  "recorded_at": "2026-11-06T13:31:05.235141+00:00",
+  "recorded_at": "2026-11-15T09:02:21.971232+00:00",
   "mode": "live",
   "extras": {
     "verdict": "fail",
