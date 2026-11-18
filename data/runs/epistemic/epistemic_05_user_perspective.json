@@ -28,10 +28,10 @@
                   "source": "user",
                   "perspective": "user",
                   "status": "active",
-                  "observed_at": "2026-11-18T12:58:26.350982Z",
+                  "observed_at": "2026-11-18T17:57:16.085917Z",
                   "provenance_id": 1,
                   "effective_confidence": 0.9,
-                  "age_hours": 9.196944444444444e-06
+                  "age_hours": 1.0074444444444445e-05
                 }
               ]
             },
@@ -46,10 +46,10 @@
                   "source": "bot_02",
                   "perspective": "third_party:bot_02",
                   "status": "active",
-                  "observed_at": "2026-11-18T12:58:26.362946Z",
+                  "observed_at": "2026-11-18T17:57:16.101878Z",
                   "provenance_id": 2,
-                  "effective_confidence": 0.6999994103333332,
-                  "age_hours": 5.896666666666666e-06
+                  "effective_confidence": 0.6999994335277777,
+                  "age_hours": 5.664722222222223e-06
                 }
               ]
             }
@@ -85,10 +85,10 @@
     }
   ],
   "final_answer": "From the user's perspective, box_01 is red_atom (confidence 0.9, source=user). This is their belief \u2014 I have not verified it against my own sensors.",
-  "started_at": "2026-11-18T12:58:26.383084Z",
-  "ended_at": "2026-11-18T12:58:26.384725Z",
+  "started_at": "2026-11-18T17:57:16.121277Z",
+  "ended_at": "2026-11-18T17:57:16.122778Z",
   "test_id": "05_user_perspective",
-  "recorded_at": "2026-11-18T12:58:26.385844+00:00",
+  "recorded_at": "2026-11-18T17:57:16.123627+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_b",

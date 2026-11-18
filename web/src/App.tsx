@@ -8,6 +8,7 @@ import type {
   Shelf,
   ShelfContents,
   Source,
+  TraceStep,
   WarehouseView,
 } from "./api/types";
 import WarehouseFloor from "./components/WarehouseFloor";
@@ -103,6 +104,8 @@ export default function App() {
   const [answer, setAnswer] = useState<AgentResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [askText, setAskText] = useState("");
+  // Steps streamed live from /api/query/stream (SSE) while the agent runs.
+  const [liveSteps, setLiveSteps] = useState<TraceStep[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
   const [reflections, setReflections] = useState<Belief[]>([]);
@@ -266,18 +269,26 @@ export default function App() {
   }, [shelfSel, xferDest, xferQty, toast]);
 
   const ask = useCallback(
-    async (text: string) => {
+    (text: string) => {
       if (!text.trim()) return;
       setBusy(true);
       setAnswer(null);
-      try {
-        const res = await api.query(text);
-        setAnswer(res);
-      } catch (e) {
-        toast("var(--blocked)", "Agent error: " + String(e));
-      } finally {
-        setBusy(false);
-      }
+      setLiveSteps([]);
+      // Switch the Control Center to the Reasoning tab so the live trace is
+      // visible while the agent runs — makes the wait feel purposeful.
+      setTab("reason");
+      api.queryStream(text, {
+        onStep: (step) => setLiveSteps((prev) => [...prev, step]),
+        onDone: (result) => {
+          setAnswer(result);
+          setBusy(false);
+        },
+        onError: (msg) => {
+          toast("var(--blocked)", "Agent error: " + msg);
+          setBusy(false);
+        },
+        maxSteps: 6,
+      });
     },
     [toast],
   );
@@ -503,7 +514,43 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
                 <span className="ttl">Ops AI</span>
                 {busy && <span className="busy">reasoning…</span>}
               </div>
-              <div className="comms-body">{busy ? "Thinking through the layers…" : answer?.answer}</div>
+              <div className="comms-body">
+                {answer ? (
+                  answer.answer
+                ) : (
+                  <>
+                    <div style={{ color: "var(--ink-2)", marginBottom: 8 }}>
+                      {liveSteps.length === 0
+                        ? "Thinking through the layers…"
+                        : `Reasoning · step ${liveSteps.length}${liveSteps[liveSteps.length - 1]?.tool_call ? ` · ${liveSteps[liveSteps.length - 1].tool_call!.name}()` : ""}`}
+                    </div>
+                    {liveSteps.length > 0 && (
+                      <div className="live-steps">
+                        {liveSteps.slice(-6).map((s, i) => (
+                          <div className="live-step" key={`${s.idx}-${i}`}>
+                            <span className="ls-idx">#{s.idx}</span>
+                            {s.tool_call ? (
+                              <>
+                                <code className="ls-name">{s.tool_call.name}</code>
+                                <span className="ls-args">
+                                  {JSON.stringify(s.tool_call.arguments).slice(0, 80)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="ls-args">{s.thought?.slice(0, 80) || "…"}</span>
+                            )}
+                            {s.observation && (
+                              <span className={"ls-ok " + (s.observation.ok ? "ok" : "err")}>
+                                {s.observation.ok ? "✓" : "✗"}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
               {answer && (
                 <div className="comms-foot">
                   {answer.tools_called.map((c, i) => <span className="chip" key={i}>{c}</span>)}
@@ -569,10 +616,10 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
                 /* Reasoning tab — the live ReAct trace. */
                 <>
                   <div className="sec-note">
-                    The agent's live ReAct trace from your last question — every
-                    thought, tool call, and observation that grounded the answer.
+                    The agent's live ReAct trace{busy ? " — streaming as it runs" : " from your last question"}:
+                    every thought, tool call, and observation that grounded the answer.
                   </div>
-                  {answer ? answer.trace.steps.map((s, i) => (
+                  {(busy ? liveSteps : (answer?.trace.steps ?? [])).length > 0 ? (busy ? liveSteps : answer!.trace.steps).map((s, i) => (
                     <div className="step" key={i}>
                       <div className="step-h">
                         <span className="step-i">#{s.idx}</span>
@@ -611,6 +658,11 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
                       )}
                     </div>
                   )) : <div className="empty">Ask a question to see the agent reason.</div>}
+                  {busy && (
+                    <div className="live-pulse">
+                      <span className="dot" /> waiting for next step…
+                    </div>
+                  )}
                 </>
               ) : tab === "trust" ? (
                 <>

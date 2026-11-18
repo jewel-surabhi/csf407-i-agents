@@ -105,6 +105,7 @@ def run_react(
     test_id: str | None = None,
     token_budget: int = DEFAULT_TOKEN_BUDGET,
     max_context_messages: int = DEFAULT_CONTEXT_MESSAGES,
+    on_step: Any = None,
 ) -> Trace:
     """Drive one ReAct episode. Returns the completed `Trace`.
 
@@ -134,6 +135,16 @@ def run_react(
         test_id=test_id,
     )
 
+    def _emit(step: Step) -> Step:
+        """Append a step AND fire the listener if one was supplied.
+        Listener errors are swallowed — streaming must never break reasoning."""
+        import contextlib
+        trace.append(step)
+        if on_step is not None:
+            with contextlib.suppress(Exception):
+                on_step(step)
+        return step
+
     for step_idx in range(1, max_steps + 1):
         messages = truncate_context(
             messages,
@@ -152,7 +163,7 @@ def run_react(
         if not response.tool_calls:
             # Free-text response with no tool call -- log it, nudge the LLM.
             thought_text = (response.content or "").strip()
-            trace.append(Step(idx=step_idx, thought=thought_text or "(empty)"))
+            _emit(Step(idx=step_idx, thought=thought_text or "(empty)"))
             if thought_text:
                 messages.append({"role": "assistant", "content": thought_text})
             messages.append({"role": "user", "content": _NUDGE})
@@ -168,7 +179,7 @@ def run_react(
 
         for tc in pending:
             result = dispatch(tc.name, tc.arguments, apis, enable_actuators=enable_actuators)
-            trace.append(
+            _emit(
                 _build_step(
                     idx=step_idx,
                     thought=response.content,
@@ -189,7 +200,7 @@ def run_react(
                 if position == 0
                 else dict(_DUPLICATE_FINALIZE)
             )
-            trace.append(
+            _emit(
                 _build_step(
                     idx=step_idx,
                     thought=response.content,

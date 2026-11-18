@@ -23,10 +23,10 @@
           "source": "default_map",
           "perspective": "self",
           "status": "active",
-          "observed_at": "2026-11-18T12:58:25.855258Z",
+          "observed_at": "2026-11-18T17:57:15.537356Z",
           "provenance_id": 2,
           "effective_confidence": 1.0,
-          "age_hours": 6.496111111111111e-06
+          "age_hours": 5.039722222222222e-06
         }
       },
       "final_answer": null
@@ -84,8 +84,8 @@
           "confidence": 0.1,
           "source_id": "default_map",
           "perspective": "self",
-          "observed_at": "2026-11-18T12:58:25.855258Z",
-          "recorded_at": "2026-11-18T12:58:25",
+          "observed_at": "2026-11-18T17:57:15.537356Z",
+          "recorded_at": "2026-11-18T17:57:15",
           "status": "downgraded",
           "payload": {
             "reason": "LiDAR disagrees with the map.",
@@ -121,8 +121,8 @@
           "confidence": 0.95,
           "source_id": "lidar_front",
           "perspective": "self",
-          "observed_at": "2026-11-18T12:58:25.908733Z",
-          "recorded_at": "2026-11-18T12:58:25",
+          "observed_at": "2026-11-18T17:57:15.579685Z",
+          "recorded_at": "2026-11-18T17:57:15",
           "status": "active",
           "payload": {
             "reason": "LiDAR hit at 12cm."
@@ -160,10 +160,10 @@
     }
   ],
   "final_answer": "Path ahead downgraded to is_clear conf 0.1 (status=downgraded); wrote is_blocked at conf 0.95 from lidar_front.",
-  "started_at": "2026-11-18T12:58:25.877707Z",
-  "ended_at": "2026-11-18T12:58:25.924314Z",
+  "started_at": "2026-11-18T17:57:15.554680Z",
+  "ended_at": "2026-11-18T17:57:15.593794Z",
   "test_id": "03_sensor_confidence_update",
-  "recorded_at": "2026-11-18T12:58:25.926635+00:00",
+  "recorded_at": "2026-11-18T17:57:15.595484+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_a",
