@@ -24,8 +24,10 @@ Owner: Person 1 (P1).
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import UTC, datetime
 
 from iagent.declarative.belief_graph import BeliefGraph
+from iagent.declarative.decay import annotate_with_decay
 from iagent.declarative.models import (
     Belief,
     KnowledgeError,  # re-export so callers only import from api
@@ -54,6 +56,10 @@ class KnowledgeAPI:
         self._graph = graph
         self._store = store
 
+    def _sources_by_id(self) -> dict[str, Source]:
+        """Cache-less lookup used by read methods to apply temporal decay."""
+        return {s.source_id: s for s in self._store.list_sources()}
+
     # ---------- reads ----------
 
     def get_belief(
@@ -64,9 +70,14 @@ class KnowledgeAPI:
     ) -> Belief | None:
         """Return the currently-active belief for (subject, predicate, perspective).
 
-        Purely a graph read — SQLite is not touched.
+        The returned Belief carries `effective_confidence` and `age_hours`
+        computed from the source's decay rate — stored confidence is left
+        untouched in the graph itself.
         """
-        return self._graph.get_active_edge(subject, predicate, perspective)
+        belief = self._graph.get_active_edge(subject, predicate, perspective)
+        if belief is None:
+            return None
+        return annotate_with_decay(belief, self._sources_by_id())
 
     def query_perspective(
         self,
@@ -79,9 +90,10 @@ class KnowledgeAPI:
         self / third-party views. Each returned `PerspectiveView` has a single
         perspective label plus every active belief that carries that label.
         """
+        sources = self._sources_by_id()
         grouped: dict[str, list[Belief]] = defaultdict(list)
         for belief in self._graph.iter_active_edges_for(subject, predicate=predicate):
-            grouped[belief.perspective].append(belief)
+            grouped[belief.perspective].append(annotate_with_decay(belief, sources))
 
         return [
             PerspectiveView(perspective=persp, beliefs=beliefs)
@@ -100,6 +112,29 @@ class KnowledgeAPI:
     def list_sources(self) -> list[Source]:
         """Registered sources with trust priors. Used by the LLM for conflict resolution."""
         return self._store.list_sources()
+
+    def list_subjects(
+        self,
+        pattern: str | None = None,
+        limit: int = 100,
+    ) -> list[str]:
+        """Distinct subjects currently in the belief graph (active edges only),
+        optionally filtered by a case-insensitive substring.
+
+        Lets the LLM DISCOVER what it has beliefs about when the user asks in
+        natural language ('aisle d' vs. the actual subject 'aisle_D'), before
+        giving up with 'I don't know'.
+        """
+        seen: set[str] = set()
+        for belief in self._graph.iter_all_edges():
+            if belief.status != "active":
+                continue
+            seen.add(belief.subject)
+        results = sorted(seen)
+        if pattern:
+            needle = pattern.lower()
+            results = [s for s in results if needle in s.lower()]
+        return results[: max(1, int(limit))]
 
     # ---------- writes ----------
 
@@ -224,6 +259,7 @@ class KnowledgeAPI:
         kind: str,
         trust_prior: float,
         description: str,
+        decay_rate_per_hour: float = 0.0,
     ) -> None:
         """Register a new source (idempotent — re-registering is a no-op).
 
@@ -235,6 +271,55 @@ class KnowledgeAPI:
                 source_id=source_id,
                 kind=kind,   # type: ignore[arg-type]  # Pydantic validates the literal
                 trust_prior=trust_prior,
+                decay_rate_per_hour=decay_rate_per_hour,
                 description=description,
             )
         )
+
+    # ---------- reflections (Reflexion-style meta-beliefs) ----------
+
+    def add_reflection(
+        self,
+        lesson: str,
+        *,
+        topic: str = "general",
+        confidence: float = 0.6,
+    ) -> ProvenanceEntry:
+        """Write a self-reflection into the belief graph as a first-class belief.
+
+        Reflections are beliefs the agent writes about ITSELF after an episode —
+        rules of thumb it has decided are worth remembering. They land under
+        subject='self.policy' with a `learned_rule:<topic>` predicate so
+        multiple lessons can coexist (one per topic) without superseding each
+        other. They use `source='self_reflection'` so their trust prior (0.3)
+        and decay rate (0.05/hr) are set correctly.
+
+        This generalizes Shinn et al.'s Reflexion from a scratchpad note to a
+        first-class epistemic object — queryable via `query_perspective`, with
+        provenance and decay like any other belief.
+        """
+        now = datetime.now(UTC)
+        return self.update_belief(
+            Belief(
+                subject="self.policy",
+                predicate=f"learned_rule:{topic}",
+                object=lesson,
+                confidence=confidence,
+                source="self_reflection",
+                perspective="self",
+                observed_at=now,
+            ),
+            reason=f"reflection:{topic}",
+        )
+
+    def list_reflections(self) -> list[Belief]:
+        """Return every active self-reflection belief, annotated with decay."""
+        sources = self._sources_by_id()
+        reflections = [
+            annotate_with_decay(b, sources)
+            for b in self._graph.iter_active_edges_for("self.policy")
+            if b.source == "self_reflection"
+        ]
+        # Newest first — most recent lesson tends to be most relevant.
+        reflections.sort(key=lambda b: b.observed_at, reverse=True)
+        return reflections

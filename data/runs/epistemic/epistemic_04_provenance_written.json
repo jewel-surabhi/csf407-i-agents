@@ -23,8 +23,10 @@
           "source": "default_map",
           "perspective": "self",
           "status": "active",
-          "observed_at": "2026-11-15T09:08:19.434451Z",
-          "provenance_id": 2
+          "observed_at": "2026-11-18T12:58:26.123420Z",
+          "provenance_id": 2,
+          "effective_confidence": 1.0,
+          "age_hours": 6.113055555555555e-06
         }
       },
       "final_answer": null
@@ -82,8 +84,8 @@
           "confidence": 0.1,
           "source_id": "default_map",
           "perspective": "self",
-          "observed_at": "2026-11-15T09:08:19.434451Z",
-          "recorded_at": "2026-11-15T09:08:19",
+          "observed_at": "2026-11-18T12:58:26.123420Z",
+          "recorded_at": "2026-11-18T12:58:26",
           "status": "downgraded",
           "payload": {
             "reason": "LiDAR disagrees.",
@@ -119,8 +121,8 @@
           "confidence": 0.95,
           "source_id": "lidar_front",
           "perspective": "self",
-          "observed_at": "2026-11-15T09:08:19.482441Z",
-          "recorded_at": "2026-11-15T09:08:19",
+          "observed_at": "2026-11-18T12:58:26.174313Z",
+          "recorded_at": "2026-11-18T12:58:26",
           "status": "active",
           "payload": {
             "reason": "LiDAR hit at 12cm."
@@ -151,10 +153,10 @@
     }
   ],
   "final_answer": "Belief graph updated; LiDAR evidence persisted.",
-  "started_at": "2026-11-15T09:08:19.455468Z",
-  "ended_at": "2026-11-15T09:08:19.495987Z",
+  "started_at": "2026-11-18T12:58:26.144112Z",
+  "ended_at": "2026-11-18T12:58:26.186934Z",
   "test_id": "04_provenance_written",
-  "recorded_at": "2026-11-15T09:08:19.497876+00:00",
+  "recorded_at": "2026-11-18T12:58:26.191097+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_a",

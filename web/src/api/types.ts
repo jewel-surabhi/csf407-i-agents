@@ -46,6 +46,12 @@ export interface MoveOption {
   reason: string;
 }
 
+export interface FiredEvent {
+  event_id: string;
+  action: string;
+  message: string;
+}
+
 export interface WarehouseView {
   id: string;
   position: string;
@@ -54,6 +60,8 @@ export interface WarehouseView {
   segments: SegmentSeed[];
   shelves: Shelf[];
   options: MoveOption[];
+  events_fired?: FiredEvent[];
+  moves_made?: number;
 }
 
 export interface SourceCount {
@@ -97,6 +105,30 @@ export interface ShelfContents {
   shelf: string;
   lots: ShelfLot[];
   total_units: number;
+}
+
+// Mirrors declarative.Source — one row in the sources registry.
+export interface Source {
+  source_id: string;
+  kind: "static_map" | "sensor" | "agent" | "user" | "llm";
+  trust_prior: number;
+  decay_rate_per_hour: number;
+  description?: string | null;
+}
+
+// Mirrors declarative.Belief — includes decay annotations from the reader.
+export interface Belief {
+  subject: string;
+  predicate: string;
+  object: string;
+  confidence: number;
+  source: string;
+  perspective: string;
+  status: "active" | "downgraded" | "retracted";
+  observed_at: string;
+  provenance_id?: number | null;
+  effective_confidence?: number | null;
+  age_hours?: number | null;
 }
 
 // Mirrors declarative.ProvenanceEntry — one row in the SQLite history log.

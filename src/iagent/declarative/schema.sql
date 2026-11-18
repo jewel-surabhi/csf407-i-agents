@@ -4,10 +4,11 @@
 
 -- Sources = origin registry (map file, sensor, external agent, user statement, LLM inference)
 CREATE TABLE IF NOT EXISTS sources (
-    source_id     TEXT PRIMARY KEY,           -- e.g. 'default_map', 'lidar_front', 'bot_02'
-    kind          TEXT NOT NULL,              -- 'static_map'|'sensor'|'agent'|'user'|'llm'
-    trust_prior   REAL NOT NULL DEFAULT 0.5,  -- baseline trust weight 0..1
-    description   TEXT
+    source_id            TEXT PRIMARY KEY,           -- e.g. 'default_map', 'lidar_front', 'bot_02'
+    kind                 TEXT NOT NULL,              -- 'static_map'|'sensor'|'agent'|'user'|'llm'
+    trust_prior          REAL NOT NULL DEFAULT 0.5,  -- baseline trust weight 0..1
+    decay_rate_per_hour  REAL NOT NULL DEFAULT 0.0,  -- confidence lost per hour (temporal decay)
+    description          TEXT
 );
 
 -- Every belief write leaves a provenance row.

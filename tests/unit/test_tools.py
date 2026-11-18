@@ -144,6 +144,7 @@ REQUIRED_TOOLS = frozenset(
         "query_perspective",
         "query_provenance",
         "list_sources",
+        "list_subjects",
         "update_belief",
         "downgrade_belief",
         "sense_lidar",

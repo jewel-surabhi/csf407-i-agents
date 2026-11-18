@@ -224,10 +224,40 @@ svg.floor text{font-family:var(--f-sign)}
 .step-fa{font-size:13px;line-height:1.5;color:var(--ink);background:var(--clear-bg);
   border:1px solid var(--clear);border-radius:8px;padding:8px 11px}
 .trust{display:flex;flex-direction:column;gap:7px} .trow{display:flex;align-items:center;gap:10px}
-.trow .tn{font-size:12.5px;width:120px;flex:none} .trow .tn .kd{display:block;font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
+.trow .tn{font-size:12.5px;width:120px;flex:none;word-break:break-all} .trow .tn .kd{display:block;font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em}
 .trow .bar{flex:1;height:8px;border-radius:999px;background:var(--line-2);overflow:hidden;min-width:0} .trow .bar>i{display:block;height:100%;border-radius:999px}
 .trow .tv{font-family:var(--f-mono);font-size:12px;width:34px;text-align:right}
 .trow.sensor .bar>i{background:var(--clear)} .trow.system .bar>i{background:var(--warn)}
+.trow .decay{font-family:var(--f-mono);font-size:10.5px;min-width:52px;text-align:right;padding:2px 5px;border-radius:5px}
+.trow .decay.on{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.trow .decay.off{color:var(--ink-3);background:var(--panel-2);border:1px solid var(--line)}
+
+/* Freshness chip on provenance rows + reflection rows. */
+.fresh{display:inline-block;margin-left:6px;font-family:var(--f-mono);font-size:10px;
+  padding:1px 5px;border-radius:5px;vertical-align:1px}
+.fresh-fresh{background:color-mix(in srgb,var(--clear) 18%,transparent);color:var(--clear)}
+.fresh-aging{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.fresh-stale{background:color-mix(in srgb,var(--blocked) 18%,transparent);color:var(--blocked)}
+.fresh .dec{opacity:.9}
+.fresh .was{opacity:.55;margin-left:3px}
+
+/* Reflections tab. */
+.pill-ct{display:inline-block;margin-left:5px;font-family:var(--f-mono);font-size:10px;
+  background:var(--accent);color:var(--accent-ink);padding:1px 5px;border-radius:999px;font-weight:700}
+.teach{display:flex;flex-direction:column;gap:7px;padding:11px;border:1px dashed var(--line);
+  border-radius:11px;background:var(--panel-2)}
+.teach label{font-size:11px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+.teach input, .teach textarea{font-family:var(--f-body);font-size:13px;padding:7px 9px;border:1px solid var(--line);
+  border-radius:8px;background:var(--panel);color:var(--ink);resize:vertical;outline:none}
+.teach input:focus, .teach textarea:focus{border-color:var(--accent)}
+.refls{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.refl{border:1px solid var(--line);border-radius:10px;background:var(--panel-2);padding:9px 11px;display:flex;flex-direction:column;gap:5px}
+.refl-h{display:flex;align-items:center;gap:7px}
+.refl-topic{font-family:var(--f-mono);font-size:11px;background:color-mix(in srgb,var(--accent) 16%,transparent);
+  color:var(--accent);padding:2px 7px;border-radius:5px;font-weight:600}
+.refl-body{font-size:13px;line-height:1.45;color:var(--ink)}
+.refl-foot{font-family:var(--f-mono);font-size:11px;color:var(--ink-2)}
+.refl-foot .was{opacity:.6;margin-left:4px}
 .empty{color:var(--ink-3);font-size:13px;text-align:center;padding:24px 10px;line-height:1.6}
 
 /* connection banner */

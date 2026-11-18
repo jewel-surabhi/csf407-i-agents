@@ -132,18 +132,18 @@ def test_apply_beliefs_adds_edges_when_present(graph):
 def test_seed_sources_populates_from_repo_seed(store):
     seed_sources(store, _PROVENANCE_SQL)
     ids = {s.source_id for s in store.list_sources()}
-    # The 6 sources our scenarios rely on.
+    # The 7 sources our scenarios rely on (6 base + self_reflection for Reflexion-style meta-beliefs).
     assert ids == {"default_map", "lidar_front", "camera_front", "bot_02",
-                   "user", "llm_infer"}
+                   "user", "llm_infer", "self_reflection"}
 
 
 def test_seed_sources_is_idempotent(store):
     seed_sources(store, _PROVENANCE_SQL)
     seed_sources(store, _PROVENANCE_SQL)  # second run — INSERT OR IGNORE
     ids = [s.source_id for s in store.list_sources()]
-    # Still exactly 6, not 12.
-    assert len(ids) == 6
-    assert len(set(ids)) == 6
+    # Still exactly 7, not 14.
+    assert len(ids) == 7
+    assert len(set(ids)) == 7
 
 
 # ------------------------- seed_graph ---------------------------------------
@@ -167,7 +167,7 @@ def test_seed_from_files_full_round_trip(store, graph):
         provenance_sql=_PROVENANCE_SQL,
         beliefs_json=_BELIEFS_JSON,
     )
-    assert summary["sources"] == 6
+    assert summary["sources"] == 7
     assert summary["nodes_added"] >= 4
     assert graph.has_node("robot")
     # Newly seeded graph can be used with the API façade for a full scenario.

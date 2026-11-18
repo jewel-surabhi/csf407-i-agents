@@ -1,0 +1,48 @@
+# World-facts seed for the ask-bar agent.
+#
+# These beliefs are loaded into the warehouse belief graph at startup so the
+# agent can answer general questions ("what are our hours?", "who runs the
+# night shift?", "what's the sensor-override rule?") beyond the physical
+# segment/stock data in configs/warehouse.yaml.
+#
+# Each fact lands through `KnowledgeAPI.update_belief` — same path as every
+# sensor reading — so it carries source, confidence, perspective, provenance
+# and (where source.decay_rate_per_hour > 0) temporal decay.
+#
+# Idempotent: re-running the seed is a no-op for any (subject, predicate,
+# perspective) key that already has an active belief.
+
+facts:
+  # ─── agent identity ───
+  - { subject: robot,    predicate: name,        object: AGV-1,                perspective: self, source: default_map, confidence: 1.0 }
+  - { subject: robot,    predicate: role,        object: "logistics co-pilot", perspective: self, source: default_map, confidence: 1.0 }
+  - { subject: robot,    predicate: home_bay,    object: A-S,                  perspective: self, source: default_map, confidence: 1.0 }
+  - { subject: robot,    predicate: located_at,  object: room_101,             perspective: self, source: default_map, confidence: 1.0 }
+
+  # ─── facility ───
+  - { subject: facility, predicate: name,        object: "Warehouse 7",        perspective: self, source: default_map, confidence: 1.0 }
+  - { subject: facility, predicate: opens_at,    object: "06:00",              perspective: self, source: default_map, confidence: 1.0 }
+  - { subject: facility, predicate: closes_at,   object: "22:00",              perspective: self, source: default_map, confidence: 1.0 }
+  - { subject: facility, predicate: loading_bay, object: "west column (A)",    perspective: self, source: default_map, confidence: 1.0 }
+  - { subject: facility, predicate: dispatch_bay,object: "east column (E)",    perspective: self, source: default_map, confidence: 1.0 }
+
+  # ─── operational policies ───
+  - { subject: policy, predicate: minimum_stock_threshold, object: "10",       perspective: self, source: default_map, confidence: 1.0 }
+  - { subject: policy, predicate: max_transfer_per_hour,   object: "200",      perspective: self, source: default_map, confidence: 1.0 }
+  - { subject: policy, predicate: sensor_override,
+      object: "lidar_front beats default_map on segment passability",
+      perspective: self, source: default_map, confidence: 1.0 }
+  - { subject: policy, predicate: disputed_stock_rule,
+      object: "prefer the source with the highest trust_prior, net any shipped units",
+      perspective: self, source: default_map, confidence: 1.0 }
+
+  # ─── aisle metadata — enables "which aisle has small parts?" kind of queries ───
+  - { subject: aisle_A, predicate: category, object: small_parts,     perspective: self, source: default_map, confidence: 0.9 }
+  - { subject: aisle_B, predicate: category, object: bulk_hardware,   perspective: self, source: default_map, confidence: 0.9 }
+  - { subject: aisle_C, predicate: category, object: components,      perspective: self, source: default_map, confidence: 0.9 }
+  - { subject: aisle_D, predicate: category, object: panels_cables,   perspective: self, source: default_map, confidence: 0.9 }
+  - { subject: aisle_E, predicate: category, object: finished_goods,  perspective: self, source: default_map, confidence: 0.9 }
+
+  # ─── staff roster (third-party HR records) ───
+  - { subject: shift_day,   predicate: supervisor, object: Pat,  perspective: "third_party:hr", source: user, confidence: 0.8 }
+  - { subject: shift_night, predicate: supervisor, object: Sam,  perspective: "third_party:hr", source: user, confidence: 0.8 }
