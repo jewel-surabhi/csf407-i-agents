@@ -18,8 +18,11 @@ Owner: Person 1 (P1). See PROJECT_PLAN.md section E (data/seed/*).
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from iagent.declarative.belief_graph import BeliefGraph
 from iagent.declarative.models import Belief, KnowledgeError
@@ -31,6 +34,7 @@ __all__ = [
     "seed_sources",
     "seed_graph",
     "seed_from_files",
+    "seed_world_facts",
 ]
 
 
@@ -130,3 +134,39 @@ def seed_from_files(
         "nodes_added": nodes_added,
         "edges_added": edges_added,
     }
+
+
+def seed_world_facts(knowledge, yaml_path: str | Path) -> int:
+    """Load generic world facts (agent identity, facility, policies, aisle
+    metadata, staff) from a YAML file into the belief graph via the
+    `KnowledgeAPI.update_belief` path.
+
+    Each fact carries source, perspective, confidence — identical treatment
+    to every other belief. Idempotent: an existing active belief for the
+    same (subject, predicate, perspective) key is auto-superseded by
+    `update_belief`'s at-most-one-active invariant, so re-seeding a fresh
+    copy of the same fact is safe (confidence refreshes, provenance grows).
+
+    Returns the number of facts written.
+    """
+    try:
+        data = yaml.safe_load(Path(yaml_path).read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError) as e:
+        raise KnowledgeError(f"cannot parse world-facts seed {yaml_path}: {e}") from e
+
+    facts = data.get("facts") or []
+    now = datetime.now(UTC)
+    written = 0
+    for raw in facts:
+        belief = Belief(
+            subject=str(raw["subject"]),
+            predicate=str(raw["predicate"]),
+            object=str(raw["object"]),
+            confidence=float(raw.get("confidence", 1.0)),
+            source=str(raw.get("source", "default_map")),
+            perspective=str(raw.get("perspective", "self")),
+            observed_at=now,
+        )
+        knowledge.update_belief(belief, reason="world_facts seed")
+        written += 1
+    return written

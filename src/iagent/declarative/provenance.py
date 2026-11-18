@@ -60,8 +60,21 @@ class ProvenanceStore:
         try:
             with self._conn:
                 self._conn.executescript(ddl)
+                # Migration: add decay_rate_per_hour to sources on legacy DBs
+                # that were created before the temporal-decay feature landed.
+                self._maybe_add_column(
+                    "sources",
+                    "decay_rate_per_hour",
+                    "REAL NOT NULL DEFAULT 0.0",
+                )
         except sqlite3.Error as e:
             raise KnowledgeError(f"failed to apply schema.sql: {e}") from e
+
+    def _maybe_add_column(self, table: str, column: str, ddl_fragment: str) -> None:
+        """Idempotent `ALTER TABLE ... ADD COLUMN` for migrating legacy DBs."""
+        cols = {row["name"] for row in self._conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in cols:
+            self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_fragment}")
 
     # ---- writes --------------------------------------------------------------
 
@@ -120,10 +133,17 @@ class ProvenanceStore:
             with self._conn:
                 self._conn.execute(
                     """
-                    INSERT OR IGNORE INTO sources (source_id, kind, trust_prior, description)
-                    VALUES (?, ?, ?, ?)
+                    INSERT OR IGNORE INTO sources
+                      (source_id, kind, trust_prior, decay_rate_per_hour, description)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (source.source_id, source.kind, float(source.trust_prior), source.description),
+                    (
+                        source.source_id,
+                        source.kind,
+                        float(source.trust_prior),
+                        float(source.decay_rate_per_hour),
+                        source.description,
+                    ),
                 )
         except sqlite3.Error as e:
             raise KnowledgeError(f"source insert failed: {e}") from e
@@ -228,12 +248,23 @@ class ProvenanceStore:
                 source_id=row["source_id"],
                 kind=row["kind"],
                 trust_prior=row["trust_prior"],
+                decay_rate_per_hour=self._decay_or_default(row),
                 description=row["description"],
             )
             for row in self._conn.execute(
-                "SELECT source_id, kind, trust_prior, description FROM sources"
+                "SELECT source_id, kind, trust_prior, decay_rate_per_hour, description FROM sources"
             ).fetchall()
         ]
+
+    @staticmethod
+    def _decay_or_default(row) -> float:
+        """Read decay_rate_per_hour from a row, defaulting to 0 if the column
+        is missing (legacy DB files created before the feature landed)."""
+        try:
+            value = row["decay_rate_per_hour"]
+        except (IndexError, KeyError):
+            return 0.0
+        return float(value) if value is not None else 0.0
 
 
 # ------------------------- module-private helpers ---------------------------

@@ -1,8 +1,10 @@
 import type {
   AgentResult,
+  Belief,
   InventoryView,
   ProvenanceEntry,
   ShelfContents,
+  Source,
   TransferResult,
   WarehouseView,
 } from "./types";
@@ -59,4 +61,18 @@ export const api = {
       headers: jsonHeaders,
       body: JSON.stringify({ query, scenario: scenario ?? null }),
     }).then(asJson<AgentResult>),
+
+  // Sources + their decay rates (drives the Trust panel badges).
+  sources: () => fetch("/api/warehouse/sources").then(asJson<Source[]>),
+
+  // Reflexion-style meta-beliefs. GET lists them; POST writes a new one.
+  listReflections: () =>
+    fetch("/api/warehouse/reflections").then(asJson<Belief[]>),
+
+  addReflection: (lesson: string, topic = "general", confidence = 0.6) =>
+    fetch("/api/warehouse/reflections", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ lesson, topic, confidence }),
+    }).then(asJson<Belief>),
 };

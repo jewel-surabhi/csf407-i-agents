@@ -28,6 +28,11 @@ class Belief(BaseModel):
     status: Literal["active", "downgraded", "retracted"] = "active"
     observed_at: datetime
     provenance_id: int | None = None
+    # Populated by KnowledgeAPI readers when it knows the source's decay rate
+    # and the current time. Represents `confidence` after temporal decay has
+    # been applied — stored confidence stays frozen in the graph/SQL.
+    effective_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    age_hours: float | None = Field(default=None, ge=0.0)
 
 
 class ProvenanceEntry(BaseModel):
@@ -54,11 +59,18 @@ class PerspectiveView(BaseModel):
 
 
 class Source(BaseModel):
-    """Registered source with a trust prior."""
+    """Registered source with a trust prior and a temporal-decay rate.
+
+    `decay_rate_per_hour` models how fast beliefs from this source LOSE
+    confidence as they age. 0.0 = never decays (a static map or a user
+    statement). 0.3 = loses 0.3 of confidence every hour (a LiDAR reading
+    starts at 0.95 and is 0.05 after three hours, effectively worthless).
+    """
 
     source_id: str
     kind: Literal["static_map", "sensor", "agent", "user", "llm"]
     trust_prior: float = Field(ge=0.0, le=1.0)
+    decay_rate_per_hour: float = Field(default=0.0, ge=0.0, le=1.0)
     description: str | None = None
 
 

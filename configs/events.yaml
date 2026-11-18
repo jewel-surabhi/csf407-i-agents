@@ -1,0 +1,46 @@
+# Dynamic events for Warehouse 7.
+#
+# Each entry has:
+#   - id       : stable identifier (optional; auto-generated if absent)
+#   - trigger  : one of { after_moves: N } | { on_enter: <junction> }
+#   - fires    : one of { update_belief: {...} } | { toast: "..." }
+#   - summary  : one-line human description for the UI toast (optional)
+#
+# Events fire at most once per engine lifetime. The /api/warehouse/reset
+# endpoint resets the engine so events can fire again on a fresh session.
+
+events:
+  # ─── after 3 moves, the ERP system pushes an updated WIDGET-42 count ───
+  - id: erp_sync_widget42
+    trigger: { after_moves: 3 }
+    fires:
+      update_belief:
+        subject: WIDGET-42
+        predicate: count
+        object: "55"
+        source: erp_system
+        perspective: "third_party:erp"
+        confidence: 0.6
+        reason: "ERP overnight sync (fired at move 3)"
+    summary: "ERP overnight sync pushed WIDGET-42 count → 55 (was 50 from ERP)"
+
+  # ─── entering Aisle B Upper reveals a new obstacle beyond the seeded map ───
+  - id: aisle_b_upper_obstacle
+    trigger: { on_enter: B-U }
+    fires:
+      update_belief:
+        subject: "seg:B-N|B-U"
+        predicate: is_blocked
+        object: "forklift_cross_traffic"
+        source: lidar_front
+        perspective: self
+        confidence: 0.92
+        reason: "Forklift crossed the north aisle (live LiDAR, fired on entering B-U)"
+    summary: "LiDAR flagged new obstacle on seg:B-N|B-U — forklift cross traffic"
+
+  # ─── after 5 moves, a toast-only operator advisory ───
+  - id: advisory_shift_change
+    trigger: { after_moves: 5 }
+    fires:
+      toast: "Shift change in 10 minutes — any open transfers should be closed."
+    summary: "Shift change in 10 minutes"

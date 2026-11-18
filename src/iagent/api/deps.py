@@ -5,6 +5,12 @@ singleton pattern matches the agent's real lifecycle: the DB connection,
 belief graph, and LLM client are all expensive to construct and should
 survive across requests.
 
+The agent is backed by the SAME belief graph the warehouse endpoints use,
+so questions typed into the ask bar can reach every warehouse belief (31
+segments, 10 stock rows across 3 perspectives for WIDGET-42, the full
+provenance log, world-facts seed, etc.) — not just the two tiny
+scenario_a beliefs the agent used to carry.
+
 Tests override `get_agent` via `app.dependency_overrides` to inject a
 `RecordedLLMClient`-backed agent so no test ever hits Groq.
 
@@ -16,19 +22,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from iagent.declarative.api import KnowledgeAPI
-from iagent.declarative.belief_graph import BeliefGraph
-from iagent.declarative.provenance import ProvenanceStore
-from iagent.declarative.seeding import seed_sources
 from iagent.procedural.agent import Agent
 from iagent.procedural.llm_client import LLMClient
 from iagent.sensorimotor.api import SensorimotorAPI
 from iagent.sensorimotor.mock_env import MockEnvironment
 
 _REPO = Path(__file__).resolve().parents[3]
-_DEFAULT_SEED_SQL = _REPO / "data" / "seed" / "initial_provenance.sql"
 _DEFAULT_SCENARIO = _REPO / "configs" / "scenario_a.yaml"
-_DEFAULT_DB_PATH = _REPO / "iagent.db"
 
 _agent: Agent | None = None
 
@@ -41,8 +41,7 @@ def get_agent() -> Agent:
                       app.dependency_overrides)
 
     Optional env vars:
-      IAGENT_DB_PATH  — defaults to ./iagent.db at the repo root
-      IAGENT_SCENARIO — defaults to configs/scenario_a.yaml
+      IAGENT_SCENARIO — defaults to configs/scenario_a.yaml (drives sensors)
     """
     global _agent
     if _agent is None:
@@ -58,15 +57,17 @@ def reset_agent() -> None:
 
 
 def _build_agent() -> Agent:
-    db_path = os.environ.get("IAGENT_DB_PATH", str(_DEFAULT_DB_PATH))
+    # Import locally to avoid a circular import — warehouse_routes imports
+    # several declarative modules that would pull deps.py in at import time.
+    from iagent.api.warehouse_routes import get_warehouse
+
+    # Share the warehouse's KnowledgeAPI so the ask-bar agent can answer
+    # questions about shelves, stock, segments and perspectives — not just
+    # the two tiny scenario beliefs it used to carry.
+    warehouse = get_warehouse()
+    knowledge = warehouse.knowledge
+
     scenario_yaml = os.environ.get("IAGENT_SCENARIO", str(_DEFAULT_SCENARIO))
-
-    store = ProvenanceStore(db_path)
-    seed_sources(store, _DEFAULT_SEED_SQL)  # idempotent
-
-    graph = BeliefGraph()
-    knowledge = KnowledgeAPI(graph, store)
-
     env = MockEnvironment.from_scenario(scenario_yaml)
     sensors = SensorimotorAPI(env)
 

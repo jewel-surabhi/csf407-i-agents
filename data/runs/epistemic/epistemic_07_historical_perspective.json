@@ -28,8 +28,10 @@
                   "source": "user",
                   "perspective": "user",
                   "status": "active",
-                  "observed_at": "2026-11-15T09:08:20.219979Z",
-                  "provenance_id": 1
+                  "observed_at": "2026-11-18T12:58:26.733317Z",
+                  "provenance_id": 1,
+                  "effective_confidence": 0.9,
+                  "age_hours": 8.074166666666666e-06
                 }
               ]
             },
@@ -44,8 +46,10 @@
                   "source": "bot_02",
                   "perspective": "third_party:bot_02",
                   "status": "active",
-                  "observed_at": "2026-11-15T09:08:20.234792Z",
-                  "provenance_id": 2
+                  "observed_at": "2026-11-18T12:58:26.743712Z",
+                  "provenance_id": 2,
+                  "effective_confidence": 0.6999994788333332,
+                  "age_hours": 5.211666666666667e-06
                 }
               ]
             }
@@ -78,8 +82,8 @@
               "confidence": 0.7,
               "source_id": "bot_02",
               "perspective": "third_party:bot_02",
-              "observed_at": "2026-11-15T09:08:20.234792Z",
-              "recorded_at": "2026-11-15T09:08:20",
+              "observed_at": "2026-11-18T12:58:26.743712Z",
+              "recorded_at": "2026-11-18T12:58:26",
               "status": "active",
               "payload": {
                 "reason": "scenario seed"
@@ -93,8 +97,8 @@
               "confidence": 0.9,
               "source_id": "user",
               "perspective": "user",
-              "observed_at": "2026-11-15T09:08:20.219979Z",
-              "recorded_at": "2026-11-15T09:08:20",
+              "observed_at": "2026-11-18T12:58:26.733317Z",
+              "recorded_at": "2026-11-18T12:58:26",
               "status": "active",
               "payload": {
                 "reason": "scenario seed"
@@ -132,10 +136,10 @@
     }
   ],
   "final_answer": "The historical record (third_party:bot_02 perspective) shows box_01 as blue_atom at confidence 0.7, logged by bot_02. This is a third-party log entry \u2014 not my own observation.",
-  "started_at": "2026-11-15T09:08:20.263325Z",
-  "ended_at": "2026-11-15T09:08:20.265762Z",
+  "started_at": "2026-11-18T12:58:26.761289Z",
+  "ended_at": "2026-11-18T12:58:26.764283Z",
   "test_id": "07_historical_perspective",
-  "recorded_at": "2026-11-15T09:08:20.267266+00:00",
+  "recorded_at": "2026-11-18T12:58:26.765560+00:00",
   "mode": "recorded",
   "extras": {
     "scenario": "scenario_b",

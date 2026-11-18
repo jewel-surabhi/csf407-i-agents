@@ -119,6 +119,24 @@ TOOL_SPECS: list[dict[str, Any]] = [
         "declarative memory and a sensor disagree so you know which to trust.",
         {"type": "object", "properties": {}},
     ),
+    _fn(
+        "list_subjects",
+        "List every distinct subject in the belief graph, optionally filtered "
+        "by a case-insensitive substring. Use this for DISCOVERY when the user "
+        "asks about an entity and you are not sure of its exact subject id — "
+        "e.g. the user says 'aisle d' and you want to confirm 'aisle_D' exists "
+        "before calling get_belief on it.",
+        {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Case-insensitive substring filter (optional).",
+                },
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+            },
+        },
+    ),
     # ---------- declarative writes ----------
     _fn(
         "update_belief",
@@ -379,6 +397,14 @@ def dispatch(
         if name == "list_sources":
             _require(knowledge, "knowledge")
             return _ok(knowledge.list_sources())
+
+        if name == "list_subjects":
+            _require(knowledge, "knowledge")
+            subjects = knowledge.list_subjects(
+                pattern=args.get("pattern"),
+                limit=int(args.get("limit", 100)),
+            )
+            return _ok(subjects)
 
         if name == "update_belief":
             _require(knowledge, "knowledge")

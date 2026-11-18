@@ -2,23 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api/client";
 import type {
   AgentResult,
+  Belief,
   InventoryView,
   ProvenanceEntry,
   Shelf,
   ShelfContents,
+  Source,
   WarehouseView,
 } from "./api/types";
 import WarehouseFloor from "./components/WarehouseFloor";
 import DecisionPanel from "./components/DecisionPanel";
-
-const TRUST = [
-  { nm: "Front LiDAR", kd: "Sensor", trust: 0.9, cls: "sensor" },
-  { nm: "Floor Scanner", kd: "Scanner", trust: 0.9, cls: "sensor" },
-  { nm: "Sales Log", kd: "System", trust: 0.8, cls: "system" },
-  { nm: "Dock Camera", kd: "Sensor", trust: 0.7, cls: "sensor" },
-  { nm: "ERP System", kd: "System", trust: 0.6, cls: "system" },
-  { nm: "Floor Map", kd: "Map", trust: 0.6, cls: "system" },
-];
 
 // Pills aligned with the proposal's canonical epistemic scenarios so a grader
 // opening the UI cold can run Scenario A / B straight from the ask bar.
@@ -65,6 +58,28 @@ function fmtTime(iso?: string | null): string {
   }
 }
 
+// Compute age-in-hours from an observed_at ISO string vs. now.
+function ageHours(iso?: string | null): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return 0;
+  return Math.max(0, (Date.now() - t) / 3_600_000);
+}
+
+// Freshness tier drives the colored badge on each provenance / source row.
+function freshnessTier(hours: number): "fresh" | "aging" | "stale" {
+  if (hours < 1) return "fresh";
+  if (hours < 24) return "aging";
+  return "stale";
+}
+
+function fmtAge(hours: number): string {
+  if (hours < 1 / 60) return "just now";
+  if (hours < 1) return `${Math.round(hours * 60)}m old`;
+  if (hours < 24) return `${hours.toFixed(1)}h old`;
+  return `${Math.round(hours / 24)}d old`;
+}
+
 interface Toast {
   id: number;
   dot: string;
@@ -77,7 +92,7 @@ export default function App() {
   const [pathMap, setPathMap] = useState(false);
   const [explain, setExplain] = useState(false);
   const [drawer, setDrawer] = useState(false);
-  const [tab, setTab] = useState<"reason" | "trust">("reason");
+  const [tab, setTab] = useState<"reason" | "trust" | "reflect">("reason");
   const [shelfSel, setShelfSel] = useState<Shelf | null>(null);
   const [inv, setInv] = useState<InventoryView | null>(null);
   const [bin, setBin] = useState<ShelfContents | null>(null);
@@ -89,6 +104,10 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [askText, setAskText] = useState("");
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [sources, setSources] = useState<Source[]>([]);
+  const [reflections, setReflections] = useState<Belief[]>([]);
+  const [newLesson, setNewLesson] = useState("");
+  const [newTopic, setNewTopic] = useState("");
   const toastId = useRef(0);
 
   const toast = useCallback((dot: string, html: string) => {
@@ -99,7 +118,14 @@ export default function App() {
 
   const load = useCallback(async () => {
     try {
-      setView(await api.getWarehouse());
+      const [v, srcs, refs] = await Promise.all([
+        api.getWarehouse(),
+        api.sources(),
+        api.listReflections(),
+      ]);
+      setView(v);
+      setSources(srcs);
+      setReflections(refs);
       setOffline(false);
     } catch {
       setOffline(true);
@@ -109,6 +135,28 @@ export default function App() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const refreshReflections = useCallback(async () => {
+    try {
+      setReflections(await api.listReflections());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const teachReflection = useCallback(async () => {
+    const lesson = newLesson.trim();
+    if (!lesson) return;
+    try {
+      const b = await api.addReflection(lesson, newTopic.trim() || "general");
+      toast("var(--accent)", `Learned: <b>${b.predicate.split(":").pop()}</b>`);
+      setNewLesson("");
+      setNewTopic("");
+      refreshReflections();
+    } catch (e) {
+      toast("var(--blocked)", String(e));
+    }
+  }, [newLesson, newTopic, toast, refreshReflections]);
 
   const doMove = useCallback(
     async (to: string) => {
@@ -122,13 +170,37 @@ export default function App() {
         } else if (opt) {
           toast("var(--clear)", `Moved · <b>${Math.round(opt.confidence * 100)}%</b> confident`);
         }
+        // Dynamic events: toast one notice per fired event. If any wrote a
+        // belief, refresh the selected shelf's inventory + provenance so the
+        // user sees the mutation inline instead of having to re-click.
+        const fired = next.events_fired ?? [];
+        for (const ev of fired) {
+          toast(
+            ev.action === "toast" ? "var(--accent)" : "var(--warn)",
+            `⚡ <b>${ev.event_id}</b> · ${ev.message}`,
+          );
+        }
+        if (fired.some((e) => e.action !== "toast") && shelfSel) {
+          try {
+            const [i, b, p] = await Promise.all([
+              api.inventory(shelfSel.id),
+              api.bin(shelfSel.id),
+              api.provenance(shelfSel.id),
+            ]);
+            setInv(i);
+            setBin(b);
+            setProv(p);
+          } catch {
+            /* ignore */
+          }
+        }
         const goal = next.shelves.find((s) => s.id === next.goal);
         if (goal && goal.near === next.position) toast("var(--accent)", `Reached <b>${next.goal}</b> ★`);
       } catch (e) {
         toast("var(--blocked)", String(e));
       }
     },
-    [view, toast],
+    [view, toast, shelfSel],
   );
 
   const selectShelf = useCallback(async (id: string) => {
@@ -362,6 +434,10 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
                   <ol className="prov">
                     {prov.slice(0, 8).map((p, i) => {
                       const reason = (p.payload as { reason?: string } | null | undefined)?.reason;
+                      const src = sources.find((s) => s.source_id === p.source_id);
+                      const age = ageHours(p.observed_at);
+                      const decayed = src ? Math.max(0, p.confidence - src.decay_rate_per_hour * age) : p.confidence;
+                      const tier = freshnessTier(age);
                       return (
                         <li key={p.provenance_id ?? i} className={"pv pv-" + p.status}>
                           <span className="pv-t">{fmtTime(p.recorded_at ?? p.observed_at)}</span>
@@ -373,6 +449,15 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
                             <span className="tw">{p.predicate}=</span>
                             <span className="ct">{p.object}</span>
                             {reason && <span className="tw"> · {reason}</span>}
+                            <span className={"fresh fresh-" + tier}>
+                              {fmtAge(age)}
+                              {src && src.decay_rate_per_hour > 0 && (
+                                <span className="dec">
+                                  {" · "}conf {decayed.toFixed(2)}
+                                  <span className="was">/{p.confidence.toFixed(2)}</span>
+                                </span>
+                              )}
+                            </span>
                           </span>
                           {p.status !== "active" && (
                             <span className="pv-s">{p.status}</span>
@@ -474,10 +559,14 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
             </div>
             <div className="tabs">
               <button className={"tab" + (tab === "reason" ? " active" : "")} onClick={() => setTab("reason")}>Reasoning</button>
-              <button className={"tab" + (tab === "trust" ? " active" : "")} onClick={() => setTab("trust")}>Trust</button>
+              <button className={"tab" + (tab === "trust" ? " active" : "")} onClick={() => setTab("trust")}>Trust &amp; Decay</button>
+              <button className={"tab" + (tab === "reflect" ? " active" : "")} onClick={() => setTab("reflect")}>
+                Reflections {reflections.length > 0 && <span className="pill-ct">{reflections.length}</span>}
+              </button>
             </div>
             <div className="drawer-body">
               {tab === "reason" ? (
+                /* Reasoning tab — the live ReAct trace. */
                 <>
                   <div className="sec-note">
                     The agent's live ReAct trace from your last question — every
@@ -523,18 +612,97 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
                     </div>
                   )) : <div className="empty">Ask a question to see the agent reason.</div>}
                 </>
-              ) : (
+              ) : tab === "trust" ? (
                 <>
-                  <div className="sec-note">Source trust priors — the higher prior wins a conflict.</div>
+                  <div className="sec-note">
+                    Source trust priors (higher = wins a conflict) and decay rates
+                    (confidence lost per hour — so a 2-hour-old reading is already
+                    less trustworthy than a fresh one).
+                  </div>
                   <div className="trust">
-                    {TRUST.map((s) => (
-                      <div className={"trow " + s.cls} key={s.nm}>
-                        <span className="tn">{s.nm}<span className="kd">{s.kd}</span></span>
-                        <span className="bar"><i style={{ width: s.trust * 100 + "%" }} /></span>
-                        <span className="tv">{s.trust.toFixed(2)}</span>
+                    {sources.map((s) => (
+                      <div className={"trow " + (s.kind === "sensor" ? "sensor" : "system")} key={s.source_id}>
+                        <span className="tn">
+                          {s.source_id}
+                          <span className="kd">{s.kind}</span>
+                        </span>
+                        <span className="bar"><i style={{ width: s.trust_prior * 100 + "%" }} /></span>
+                        <span className="tv">{s.trust_prior.toFixed(2)}</span>
+                        <span className={"decay " + (s.decay_rate_per_hour > 0 ? "on" : "off")}>
+                          {s.decay_rate_per_hour > 0
+                            ? `−${s.decay_rate_per_hour.toFixed(2)}/h`
+                            : "stable"}
+                        </span>
                       </div>
                     ))}
                   </div>
+                </>
+              ) : (
+                // Reflections tab — Reflexion-style meta-beliefs the agent has learned
+                <>
+                  <div className="sec-note">
+                    Reflexion-style meta-beliefs. Each is a first-class row in the
+                    belief graph under <code>subject="self.policy"</code>,
+                    source=<code>self_reflection</code> (trust 0.3, decays at 0.05/hr).
+                  </div>
+
+                  <div className="teach">
+                    <label>Teach the agent something new:</label>
+                    <input
+                      value={newTopic}
+                      onChange={(e) => setNewTopic(e.target.value)}
+                      placeholder="topic (optional)"
+                      maxLength={60}
+                    />
+                    <textarea
+                      value={newLesson}
+                      onChange={(e) => setNewLesson(e.target.value)}
+                      placeholder={'e.g. "When scanner and ERP disagree by >5 items, recount manually before trusting either."'}
+                      rows={3}
+                      maxLength={400}
+                    />
+                    <button
+                      className="iconbtn"
+                      style={{ justifyContent: "center", background: "var(--accent)", color: "var(--accent-ink)", border: "none" }}
+                      onClick={teachReflection}
+                      disabled={!newLesson.trim()}
+                    >
+                      Save as belief
+                    </button>
+                  </div>
+
+                  {reflections.length === 0 ? (
+                    <div className="empty">
+                      No reflections yet. Teach the agent a rule above — it becomes a
+                      queryable belief exactly like a sensor reading.
+                    </div>
+                  ) : (
+                    <div className="refls">
+                      {reflections.map((r, i) => {
+                        const topic = r.predicate.replace("learned_rule:", "");
+                        const age = r.age_hours ?? ageHours(r.observed_at);
+                        const tier = freshnessTier(age);
+                        const eff = r.effective_confidence ?? r.confidence;
+                        return (
+                          <div className="refl" key={r.provenance_id ?? i}>
+                            <div className="refl-h">
+                              <span className="refl-topic">{topic}</span>
+                              <span className={"fresh fresh-" + tier}>{fmtAge(age)}</span>
+                            </div>
+                            <div className="refl-body">{r.object}</div>
+                            <div className="refl-foot">
+                              <span className="tw">conf</span>{" "}
+                              <b>{eff.toFixed(2)}</b>
+                              {Math.abs(eff - r.confidence) > 0.005 && (
+                                <span className="was">/ {r.confidence.toFixed(2)} stored</span>
+                              )}
+                              <span className="tw"> · source={r.source}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </>
               )}
             </div>
