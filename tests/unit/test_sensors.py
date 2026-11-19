@@ -10,7 +10,12 @@ from pathlib import Path
 from iagent.sensorimotor.api import SensorimotorAPI
 from iagent.sensorimotor.mock_env import MockEnvironment
 from iagent.sensorimotor.models import SensorPayload, WorldState
-from iagent.sensorimotor.sensors import read_lidar
+from iagent.sensorimotor.sensors import (
+    LIDAR_MAX_CONFIDENCE,
+    LIDAR_MIN_CONFIDENCE,
+    lidar_confidence,
+    read_lidar,
+)
 
 SCENARIO_A = Path(__file__).resolve().parents[2] / "configs" / "scenario_a.yaml"
 
@@ -110,3 +115,44 @@ def test_clock_returns_now():
     assert reading.sensor == "clock"
     assert reading.status == "ok"
     assert reading.value  # ISO-8601 string
+
+
+# --- LiDAR distance-dependent confidence ------------------------------------
+
+
+def test_lidar_confidence_full_at_close_range():
+    assert lidar_confidence(0) == LIDAR_MAX_CONFIDENCE
+    assert lidar_confidence(12) == LIDAR_MAX_CONFIDENCE
+    assert lidar_confidence(50) == LIDAR_MAX_CONFIDENCE
+
+
+def test_lidar_confidence_floor_at_and_beyond_max_range():
+    assert lidar_confidence(400) == LIDAR_MIN_CONFIDENCE
+    assert lidar_confidence(1000) == LIDAR_MIN_CONFIDENCE
+
+
+def test_lidar_confidence_decreases_monotonically_with_distance():
+    values = [lidar_confidence(d) for d in range(0, 401, 10)]
+    assert all(a >= b for a, b in zip(values, values[1:]))
+    assert values[0] > values[-1]
+
+
+def test_lidar_confidence_linear_midpoint():
+    # Halfway between 50 and 400 cm -> halfway between 0.95 and 0.50.
+    assert lidar_confidence(225) == 0.725
+
+
+def test_lidar_far_obstacle_reading_has_lower_confidence():
+    world = WorldState(
+        robot={"position": "room_101"},
+        obstacles=[{"id": "far_crate", "in_front_of": "robot", "distance_cm": 200}],
+    )
+    reading = read_lidar(world, "front", observed_at=MockEnvironment().now)
+    assert reading.confidence == lidar_confidence(200)
+    assert reading.confidence < LIDAR_MAX_CONFIDENCE
+
+
+def test_lidar_no_obstacle_reports_minimum_confidence():
+    env = MockEnvironment.from_scenario(SCENARIO_A)
+    reading = SensorimotorAPI(env).sense_lidar("left")
+    assert reading.confidence == LIDAR_MIN_CONFIDENCE

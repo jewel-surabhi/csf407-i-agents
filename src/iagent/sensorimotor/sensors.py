@@ -12,13 +12,39 @@ from typing import Any
 
 from iagent.sensorimotor.models import SensorPayload, WorldState
 
-__all__ = ["read_lidar", "read_camera", "read_clock"]
+__all__ = ["read_lidar", "read_camera", "read_clock", "lidar_confidence"]
 
 # LiDAR: obstacles closer than this count as "blocked".
 LIDAR_BLOCK_THRESHOLD_CM = 30
 # LiDAR nominal max range in this mock — beyond this we report "clear".
 LIDAR_MAX_RANGE_CM = 400
-LIDAR_CONFIDENCE = 0.95
+
+# LiDAR confidence falls off with distance: returns from far-away surfaces are
+# weaker and more prone to noise / missed thin objects. Readings up to
+# LIDAR_FULL_CONFIDENCE_RANGE_CM keep full confidence; beyond that it drops
+# linearly to LIDAR_MIN_CONFIDENCE at LIDAR_MAX_RANGE_CM.
+LIDAR_MAX_CONFIDENCE = 0.95
+LIDAR_MIN_CONFIDENCE = 0.50
+LIDAR_FULL_CONFIDENCE_RANGE_CM = 50
+# Kept for backward compatibility: confidence of a close-range reading.
+LIDAR_CONFIDENCE = LIDAR_MAX_CONFIDENCE
+
+
+def lidar_confidence(distance_cm: float) -> float:
+    """Confidence of a LiDAR return at `distance_cm`.
+
+    - distance <= LIDAR_FULL_CONFIDENCE_RANGE_CM  -> LIDAR_MAX_CONFIDENCE
+    - distance >= LIDAR_MAX_RANGE_CM              -> LIDAR_MIN_CONFIDENCE
+    - in between: linear interpolation, rounded to 3 decimals.
+    """
+    if distance_cm <= LIDAR_FULL_CONFIDENCE_RANGE_CM:
+        return LIDAR_MAX_CONFIDENCE
+    if distance_cm >= LIDAR_MAX_RANGE_CM:
+        return LIDAR_MIN_CONFIDENCE
+    span = LIDAR_MAX_RANGE_CM - LIDAR_FULL_CONFIDENCE_RANGE_CM
+    frac = (distance_cm - LIDAR_FULL_CONFIDENCE_RANGE_CM) / span
+    conf = LIDAR_MAX_CONFIDENCE - frac * (LIDAR_MAX_CONFIDENCE - LIDAR_MIN_CONFIDENCE)
+    return round(conf, 3)
 
 
 def read_lidar(
@@ -38,7 +64,8 @@ def read_lidar(
             kind="distance_cm",
             value=LIDAR_MAX_RANGE_CM,
             status="clear",
-            confidence=LIDAR_CONFIDENCE,
+            # Nothing returned within range: the weakest kind of evidence.
+            confidence=lidar_confidence(LIDAR_MAX_RANGE_CM),
             observed_at=observed_at,
             raw={"distance_cm": LIDAR_MAX_RANGE_CM},
         )
@@ -50,7 +77,7 @@ def read_lidar(
         kind="distance_cm",
         value=distance_cm,
         status=status,
-        confidence=LIDAR_CONFIDENCE,
+        confidence=lidar_confidence(distance_cm),
         observed_at=observed_at,
         raw={
             "distance_cm": distance_cm,
