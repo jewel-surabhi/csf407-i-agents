@@ -5,6 +5,7 @@ import type {
   ProvenanceEntry,
   ShelfContents,
   Source,
+  TraceStep,
   TransferResult,
   WarehouseView,
 } from "./types";
@@ -75,4 +76,74 @@ export const api = {
       headers: jsonHeaders,
       body: JSON.stringify({ lesson, topic, confidence }),
     }).then(asJson<Belief>),
+
+  /**
+   * Streaming version of `query` — emits steps one by one as the agent runs
+   * them, then calls onDone with the final AgentResult (or onError).
+   * Returns an abort function the caller can invoke to cancel the stream.
+   */
+  queryStream: (
+    query: string,
+    opts: {
+      onStep?: (step: TraceStep) => void;
+      onDone?: (result: AgentResult) => void;
+      onError?: (message: string) => void;
+      scenario?: string;
+      maxSteps?: number;
+    } = {},
+  ): (() => void) => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch("/api/query/stream", {
+          method: "POST",
+          headers: jsonHeaders,
+          signal: controller.signal,
+          body: JSON.stringify({
+            query,
+            scenario: opts.scenario ?? null,
+            max_steps: opts.maxSteps ?? null,
+          }),
+        });
+        if (!res.ok || !res.body) {
+          opts.onError?.(`stream HTTP ${res.status}`);
+          return;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          // SSE frames are separated by a blank line.
+          let idx = buf.indexOf("\n\n");
+          while (idx !== -1) {
+            const frame = buf.slice(0, idx);
+            buf = buf.slice(idx + 2);
+            const line = frame.split("\n").find((l) => l.startsWith("data: "));
+            if (line) {
+              try {
+                const msg = JSON.parse(line.slice(6));
+                if (msg.kind === "step") opts.onStep?.(msg.data as TraceStep);
+                else if (msg.kind === "done") opts.onDone?.(msg.data as AgentResult);
+                else if (msg.kind === "error") {
+                  const err = msg.data || {};
+                  opts.onError?.(err.message || "agent error");
+                }
+              } catch {
+                /* malformed frame — skip */
+              }
+            }
+            idx = buf.indexOf("\n\n");
+          }
+        }
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") {
+          opts.onError?.(String(e));
+        }
+      }
+    })();
+    return () => controller.abort();
+  },
 };

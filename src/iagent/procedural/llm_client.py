@@ -35,7 +35,9 @@ __all__ = [
 
 # Open-weight, tool-calling, available on the Groq free tier. Overridable via
 # `LLM_MODEL` in .env or the `llm.model` key in configs/default.yaml.
-DEFAULT_MODEL = "openai/gpt-oss-20b"
+# llama-3.3-70b-versatile: higher capability (3.5-5x fewer tool calls than
+# gpt-oss-20b on the same question) AND a separate daily TPD quota.
+DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
 # Where unparseable tool-call arguments are stashed so the dispatcher reports a
 # recoverable `missing_argument` instead of the loop crashing.

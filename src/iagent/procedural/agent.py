@@ -66,11 +66,16 @@ class Agent:
         enable_actuators: bool | None = None,
         runs_dir: str | Path | None = None,
         test_id: str | None = None,
+        on_step: Any = None,
     ) -> AgentResult:
         """Execute one ReAct episode and return the final answer + Trace.
 
         Every keyword overrides the corresponding config value; anything left
         as None falls back to config, then to the documented default.
+
+        If `on_step` is given, it is called with each Step as the loop
+        produces it — used by the streaming query endpoint to push live
+        progress to the UI without waiting for the whole episode to finish.
 
         Raises `react_loop.MaxStepsExceeded` if the LLM never calls
         `finalize_answer` within the step budget. The exception carries the
@@ -88,6 +93,7 @@ class Agent:
             max_context_messages=self._int(
                 "react", "max_context_messages", DEFAULT_CONTEXT_MESSAGES
             ),
+            on_step=on_step,
         )
         return AgentResult(
             answer=trace.final_answer,

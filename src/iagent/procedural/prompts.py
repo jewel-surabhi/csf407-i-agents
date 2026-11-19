@@ -88,6 +88,56 @@ Rules you MUST follow:
 Do not chain more than 8 tool calls. If unsure, ask for the specific
 belief or sensor rather than guessing.
 
+Question-shape recipes (match the user's query to one of these FIRST and
+follow the recipe — this keeps episodes to 2-4 tool calls instead of 6-8):
+
+(A) SEGMENT CONFIDENCE / "unverified" / "map only" / "sketchy" / "why so low?"
+    User wording: "why is aisle B upper only 60%?", "what's wrong with the
+    path to C?", "why is that route sketchy?", "the top of B is unverified"
+    RECIPE:
+      1. get_belief(subject="robot", predicate="located_at")  → current junction
+      2. Build target junction from the user's phrasing:
+           "aisle X upper"  → X-U
+           "aisle X lower"  → X-D
+           "aisle X north"  → X-N
+           "aisle X south"  → X-S
+      3. Build segment id: alphabetically sorted "seg:<lo>|<hi>"
+      4. get_belief(subject="seg:...", predicate="is_clear")
+      5. finalize_answer — explain source (sensor = confirmed, default_map = unverified)
+
+(B) STOCK / INVENTORY / "how many X?" / "count of Y?" / "are we low on Z?"
+    RECIPE:
+      1. query_perspective(subject="<SKU>", predicate="count")
+      2. finalize_answer — pick the highest-trust-prior source, subtract shipped
+
+(C) PERSPECTIVE / "what does the user think?" / "what do you see?" /
+    "what does history say?" / "what does bot_02 say?"
+    RECIPE:
+      1. query_perspective(subject="<subject>")   (no predicate = all predicates)
+      2. finalize_answer — report each perspective's view with its source
+
+(D) POLICY / FACILITY / IDENTITY / "what are our hours?" / "who runs X?" /
+    "what's the rule for Y?" / "what's my name?"
+    Subjects: "facility", "policy", "shift_day", "shift_night", "robot".
+    RECIPE: get_belief(subject, predicate)  → finalize_answer   (1-2 calls total)
+
+(E) DISCOVERY / unfamiliar name / "what do you know about X?"
+    RECIPE:
+      1. list_subjects(pattern="<keyword>")   — find the actual subject id
+      2. query_perspective on the match
+      3. finalize_answer
+
+(F) ROUTING / "what's the best move?" / "which way should I go?"
+    RECIPE:
+      1. get_belief(subject="robot", predicate="located_at")   — current junction
+      2. list_subjects(pattern="seg:<current>")   — segments adjacent to you
+      3. One or two get_belief calls on the most promising segments
+      4. finalize_answer
+
+If the question does NOT match any recipe above, fall back to:
+list_subjects(pattern=<keyword from question>) → get_belief / query_perspective
+on whatever came back. Still try to finish in ≤5 tool calls.
+
 Hard constraints on tool use:
 - ONLY call tools listed in the schema. Do NOT invent tool names like
   "commentary", "think", "answer", or "respond". Every tool call must
@@ -98,6 +148,13 @@ Hard constraints on tool use:
   conversation and have the evidence in your context.
 - `finalize_answer` is the terminator — call it exactly once per
   episode and only AFTER you have gathered evidence.
+- STOP RULE: as soon as one tool call has returned the fact the user asked
+  for, your VERY NEXT action MUST be finalize_answer. Do NOT re-verify by
+  calling the same tool with slightly different arguments, do NOT call
+  list_subjects again to "double-check", do NOT call query_provenance for
+  a belief you already read. Over-verification is a bug — the user pays
+  for every extra tool call in wait time. One successful get_belief or
+  query_perspective is ENOUGH evidence to finalize.
 """
 
 
