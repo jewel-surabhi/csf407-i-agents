@@ -1,0 +1,1267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Warehouse 7 — Ghost-block timeline</title>
+<style>
+  :root {
+    --bg:#efece4; --floor:#e4e0d6; --panel:#ffffff; --panel-2:#f6f4ee;
+    --ink:#1c2024; --ink-2:#5b636c; --ink-3:#8b929b; --line:#d6d1c6; --line-2:#e6e2d9;
+    --accent:#0d7d74; --accent-ink:#ffffff; --accent-soft:#d9efec;
+    --clear:#2c9b6a; --clear-bg:#e3f3ea; --warn:#c98a1b; --warn-bg:#f6ecd6;
+    --blocked:#cf4330; --blocked-bg:#f7e2dd; --robot:#2b6fb3; --unknown:#9aa1a9;
+    --ghost:#cf4330; --ghost-user:#7f56d9; --ghost-third:#c98a1b; --truth:#1c2024; --shelf:#d9d4c8;
+    --shadow:0 1px 2px rgba(28,32,36,.08),0 8px 24px rgba(28,32,36,.08);
+    --mono: ui-monospace, "IBM Plex Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg:#10141a; --floor:#1f2630; --panel:#181d25; --panel-2:#1f2630;
+    --ink:#eef1f5; --ink-2:#9aa4b1; --ink-3:#6c7682; --line:#2b333d; --line-2:#232b34;
+    --accent:#2dd4bf; --accent-ink:#06201d; --accent-soft:#12302d;
+    --clear:#36c088; --clear-bg:#13302a; --warn:#e0a632; --warn-bg:#352a16;
+    --blocked:#f0634c; --blocked-bg:#3a1f1c; --robot:#5a9ae6; --unknown:#6c7682;
+    --ghost:#f0634c; --truth:#eef1f5; --shelf:#3a4653; color-scheme: dark;
+  } }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); overflow: hidden; }
+  .app { height: 100%; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 9px; }
+  .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .brand h1 { font-size: 17px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin: 0; }
+  .brand .sub { font-size: 11px; color: var(--ink-2); letter-spacing: .12em; text-transform: uppercase; border-left: 1px solid var(--line); padding-left: 9px; }
+  .mode-pill { padding: 3px 10px; border-radius: 999px; font-size: 12px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .clock { display: flex; align-items: center; gap: 9px; }
+  .clock .hour { font-size: 20px; font-weight: 700; min-width: 78px; }
+  .clock input[type=range] { width: 130px; }
+  .past-note { color: var(--blocked); font-size: 12px; font-weight: 600; }
+  .spacer { flex: 1; }
+  .tgl { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; cursor: pointer; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); user-select: none; }
+  .tgl .sw { width: 26px; height: 15px; border-radius: 999px; background: var(--line); position: relative; transition: background .15s; }
+  .tgl .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .tgl.on .sw { background: var(--accent); } .tgl.on .sw::after { transform: translateX(11px); }
+  button { font: inherit; padding: 6px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.small { padding: 2px 8px; font-size: 12px; }
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 420px; }
+  .left { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--line); }
+  /* palette */
+  .palette { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 12.5px; }
+  .palette .lbl { color: var(--ink-2); font-weight: 600; }
+  .tool { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); cursor: grab; user-select: none; touch-action: none; }
+  .tool:hover { border-color: var(--accent); }
+  .tool small { color: var(--ink-3); }
+  .tool.disabled { opacity: .4; pointer-events: none; }
+  .sw-box { width: 16px; height: 16px; border-radius: 3px; display: inline-block; }
+  .sw-truth { background: var(--truth); }
+  .sw-ghost { border: 1.5px dashed var(--ghost); background: color-mix(in srgb, var(--ghost) 40%, transparent); }
+  .sw-clear { border: 1.5px dashed var(--clear); background: color-mix(in srgb, var(--clear) 30%, transparent); }
+  .trash { margin-left: auto; padding: 5px 12px; border: 1.5px dashed var(--line); border-radius: 8px; color: var(--ink-3); }
+  .trash.hot { border-color: var(--blocked); color: var(--blocked); background: var(--blocked-bg); }
+  select, input[type=number], input[type=text], input[type=password] { font: inherit; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  input[type=number] { width: 70px; }
+  #mapwrap { flex: 1; min-height: 0; position: relative; background: var(--floor); }
+  svg#map { width: 100%; height: 100%; display: block; }
+  .legend { display: flex; flex-wrap: wrap; gap: 3px 16px; padding: 5px 12px; font-size: 11.5px; color: var(--ink-2); background: var(--panel); border-top: 1px solid var(--line); }
+  .legend .sw { display: inline-block; width: 18px; height: 4px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+  .legend .sq { display: inline-block; width: 11px; height: 11px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+  /* ask bar */
+  .askbar { background: var(--panel); border-top: 1px solid var(--line); padding: 8px 12px 10px; }
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 7px; }
+  .pill { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; }
+  .askrow { display: flex; gap: 8px; }
+  .askrow input { flex: 1; padding: 8px 10px; border-radius: 9px; }
+  .askrow .run { min-width: 82px; }
+  .agent-mode { font-size: 11.5px; color: var(--ink-3); margin-top: 5px; }
+  /* right panel */
+  aside { display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); padding: 0 8px; gap: 2px; flex-wrap: wrap; }
+  .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 9px 10px; font-weight: 600; font-size: 13px; color: var(--ink-2); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab .ct { font-size: 10.5px; background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+  #panel { overflow-y: auto; padding: 10px 14px 40px; flex: 1; }
+  section { border-bottom: 1px solid var(--line-2); padding: 10px 0 12px; }
+  section:last-child { border-bottom: none; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); margin: 0 0 8px; font-weight: 700; }
+  h3 { font-size: 13px; margin: 10px 0 6px; font-weight: 600; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+  .muted { color: var(--ink-3); font-size: 12px; }
+  .hint { color: var(--ink-2); font-size: 12px; margin: 5px 0 0; }
+  .err { color: var(--blocked); font-size: 12.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 4px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+  th { color: var(--ink-3); font-weight: 600; }
+  tr.winner td { background: var(--accent-soft); }
+  tr.inactive td { color: var(--ink-3); text-decoration: line-through; }
+  .tag { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+  .tag.blocked { background: var(--blocked-bg); color: var(--blocked); } .tag.clear { background: var(--clear-bg); color: var(--clear); } .tag.unknown { background: var(--line-2); color: var(--ink-2); }
+  .stat { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 13px; }
+  .p-bar { height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--clear), var(--unknown) 50%, var(--blocked)); position: relative; margin: 4px 0 2px; }
+  .p-bar i { position: absolute; top: -3px; width: 3px; height: 14px; background: var(--ink); border-radius: 2px; }
+  /* decision panel */
+  .here { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .here .pin { width: 30px; height: 30px; border-radius: 50%; background: var(--robot); color: #fff; display: grid; place-items: center; font-weight: 700; }
+  .here small { display: block; color: var(--ink-3); font-size: 11px; }
+  .opt { display: block; width: 100%; text-align: left; margin: 6px 0; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); }
+  .opt-top { display: flex; align-items: center; gap: 8px; }
+  .opt-dir { font-size: 16px; width: 18px; text-align: center; }
+  .opt-name { flex: 1; font-weight: 600; }
+  .opt-name small { color: var(--accent); font-weight: 600; }
+  .opt-conf { font-weight: 700; font-size: 13px; padding: 1px 7px; border-radius: 6px; }
+  .tier-high { color: var(--clear); background: var(--clear-bg); } .tier-medium { color: var(--warn); background: var(--warn-bg); } .tier-low { color: var(--blocked); background: var(--blocked-bg); }
+  .opt-bar { height: 4px; border-radius: 2px; background: var(--line-2); margin: 6px 0 4px; overflow: hidden; }
+  .opt-bar i { display: block; height: 100%; }
+  .bar-high { background: var(--clear); } .bar-medium { background: var(--warn); } .bar-low { background: var(--blocked); }
+  .opt-reason { font-size: 12px; color: var(--ink-2); }
+  .opt-why { font-size: 12px; color: var(--ink-2); margin-top: 5px; padding-top: 5px; border-top: 1px dashed var(--line); }
+  .why { background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 10px; padding: 9px 11px; font-size: 13px; margin-top: 8px; }
+  .why p { margin: 0 0 6px; } .why p:last-child { margin-bottom: 0; }
+  ol.steps { margin: 4px 0 0 18px; padding: 0; font-size: 12px; }
+  /* agent answer + trace */
+  .answer { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; }
+  .answer p { margin: 0 0 7px; } .answer p:last-child { margin: 0; }
+  .answer .q { font-weight: 700; margin-bottom: 6px; }
+  .cite { font-family: var(--mono); font-size: 11.5px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; white-space: nowrap; }
+  .step { border: 1px solid var(--line-2); border-radius: 9px; padding: 7px 9px; margin: 7px 0; font-size: 12px; }
+  .step-h { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+  .step-i { font-weight: 700; color: var(--ink-3); }
+  .step-tag { font-size: 10.5px; font-weight: 700; padding: 0 6px; border-radius: 4px; background: var(--line-2); }
+  .step-tag.tc { background: var(--accent-soft); color: var(--accent); }
+  .step-tag.fa { background: var(--clear-bg); color: var(--clear); }
+  .step pre { margin: 4px 0 0; font: 11px/1.4 var(--mono); white-space: pre-wrap; word-break: break-word; background: var(--panel-2); border-radius: 6px; padding: 5px 7px; max-height: 180px; overflow: auto; }
+  ul.log { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+  ul.log li { padding: 4px 0; border-bottom: 1px dashed var(--line); display: flex; gap: 6px; align-items: baseline; }
+  ul.log li.future { color: var(--ink-3); font-style: italic; }
+  ul.log .h { font-weight: 700; min-width: 30px; }
+  ul.log .d { flex: 1; }
+  details summary { cursor: pointer; font-weight: 600; font-size: 13px; margin: 4px 0; }
+  textarea { width: 100%; height: 280px; font: 12px/1.4 var(--mono); border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 8px; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 30; }
+  .modal { background: var(--panel); border-radius: 12px; padding: 16px; width: min(760px, 92vw); max-height: 90vh; overflow: auto; }
+  .dragav { position: fixed; z-index: 40; pointer-events: none; transform: translate(-50%, -50%); width: 26px; height: 26px; border-radius: 4px; box-shadow: var(--shadow); }
+  .seg-hit { stroke: transparent; stroke-width: 20; cursor: pointer; }
+  .dragable { cursor: grab; }
+  .toast { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); background: var(--ink); color: var(--panel); padding: 8px 14px; border-radius: 10px; font-size: 13px; z-index: 50; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 80vw; }
+  .toast.show { opacity: .95; }
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="brand" title="Ghost-block timeline"><span class="dot"></span><h1>Warehouse&nbsp;7</h1></div>
+  <span class="mode-pill" id="modePill">Build · hour 0</span>
+  <div class="clock" id="clockBox">
+    <span class="hour" id="hourLabel">Hour 0</span>
+    <button class="primary small" id="btnNextHdr">Next hour ▸</button>
+    <button class="small" id="btnReset" title="Back to hour 0 as it was when the timeline started">↺ Reset</button>
+    <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="View hour" />
+    <button id="btnNow" class="small">Back to now</button>
+    <span class="past-note" id="pastNote"></span>
+  </div>
+  <div class="spacer"></div>
+  <span class="tgl" id="tglExplain"><span class="sw"></span>Explain</span>
+  <span class="tgl" id="tglLabels"><span class="sw"></span>Labels</span>
+  <span class="tgl" id="tglTruth"><span class="sw"></span>Real world</span>
+  <button class="small" id="btnExport">Export YAML</button>
+  <button class="small" id="btnSave">Save</button>
+  <button class="small" id="btnLoad">Load</button>
+  <input type="file" id="fileLoad" accept="application/json" style="display:none" />
+</header>
+<main>
+  <div class="left">
+    <div class="palette" id="palette">
+      <span class="lbl" id="palLbl">Drag onto a segment:</span>
+      <span class="tool" data-tool="truth" title="A real obstacle. The robot is not told — it must scan or bump into it."><span class="sw-box sw-truth"></span>Real box <small>hidden</small></span>
+      <span class="tool" data-tool="ghost" title="A report that the segment is blocked — goes into the robot's beliefs only."><span class="sw-box sw-ghost"></span>Ghost box <small>report</small></span>
+      <span class="tool" data-tool="clear" title="A report that the segment is clear."><span class="sw-box sw-clear"></span>“Clear” report</span>
+      <label class="muted">from <select id="palSrc"></select></label>
+      <label class="muted">conf <select id="palConf"></select></label>
+      <span class="trash" id="trash" title="Drop a box here to remove it">🗑 remove</span>
+    </div>
+    <div id="mapwrap"><svg id="map" viewBox="200 70 900 560" role="img" aria-label="Warehouse floor map with ghost blocks"></svg></div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--clear)"></span>likely clear</span>
+      <span><span class="sw" style="background:var(--unknown)"></span>uncertain</span>
+      <span><span class="sw" style="background:var(--blocked)"></span>likely blocked</span>
+      <span><span class="sq" style="border:1.5px dashed var(--ghost);background:color-mix(in srgb,var(--ghost) 40%,transparent)"></span>ghost box (number = confidence now)</span>
+      <span><span class="sq" style="border:1.5px dashed var(--ghost-user)"></span>operator report</span>
+      <span id="legendTruth"><span class="sq" style="background:var(--truth)"></span>real box (drag to move)</span>
+      <span><span class="sw" style="background:var(--robot);height:6px"></span>route preview</span>
+      <span><span class="sq" style="border:1.5px solid var(--clear);border-radius:6px;width:20px"></span>label = stored confidence (green: says clear, red: says blocked)</span>
+      <span><span class="sq" style="background:var(--warn-bg);border:1.5px solid var(--warn);border-radius:6px;width:28px"></span>changed by a scan this hour (old→new)</span>
+      <span><span class="sw" style="background:var(--accent);height:6px;opacity:.6"></span>pending scan</span>
+      <span><span class="sw" style="background:var(--ink-3);height:4px"></span>previous path</span>
+    </div>
+    <div class="askbar">
+      <div class="pills" id="pills"></div>
+      <div class="askrow">
+        <input type="text" id="askInput" placeholder="Ask the robot — why this path? what did the scan change? is C-D to D-D blocked?" />
+        <button class="primary run" id="btnAsk">Ask</button>
+      </div>
+      <div class="agent-mode" id="agentMode"></div>
+    </div>
+  </div>
+  <aside>
+    <div class="tabs" id="tabs"></div>
+    <div id="panel"></div>
+  </aside>
+</main>
+</div>
+
+<div class="modal-bg" id="exportModal">
+  <div class="modal">
+    <div class="row" style="justify-content:space-between"><b>Export</b><button class="small" id="btnCloseExport">Close</button></div>
+    <p class="hint">Hour-0 scenario in <code>configs/warehouse.yaml</code> format, then the timeline as an <code>events.yaml</code>-style list. The backend's EventEngine only understands <code>after_moves</code> / <code>on_enter</code>; <code>at_hour</code> and <code>truth</code> are new.</p>
+    <h3>warehouse.yaml</h3>
+    <textarea id="yamlWarehouse" readonly></textarea>
+    <div class="row"><button class="small" data-dl="yamlWarehouse" data-name="warehouse.yaml">Download</button></div>
+    <h3>events.yaml</h3>
+    <textarea id="yamlEvents" readonly style="height:180px"></textarea>
+    <div class="row"><button class="small" data-dl="yamlEvents" data-name="events.yaml">Download</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+// ───────────────────────── data from configs/warehouse.yaml ─────────────────────────
+const WH = {"id":"warehouse_7","start":"A-S","goal":"WIDGET-42","junctions":{"A-N":{"label":"Aisle A \u00b7 North","x":280,"y":120},"B-N":{"label":"Aisle B \u00b7 North","x":460,"y":120},"C-N":{"label":"Aisle C \u00b7 North","x":640,"y":120},"D-N":{"label":"Aisle D \u00b7 North","x":820,"y":120},"E-N":{"label":"Aisle E \u00b7 North","x":1000,"y":120},"A-U":{"label":"Aisle A \u00b7 Upper","x":280,"y":275},"B-U":{"label":"Aisle B \u00b7 Upper","x":460,"y":275},"C-U":{"label":"Aisle C \u00b7 Upper","x":640,"y":275},"D-U":{"label":"Aisle D \u00b7 Upper","x":820,"y":275},"E-U":{"label":"Aisle E \u00b7 Upper","x":1000,"y":275},"A-D":{"label":"Aisle A \u00b7 Lower","x":280,"y":430},"B-D":{"label":"Aisle B \u00b7 Lower","x":460,"y":430},"C-D":{"label":"Aisle C \u00b7 Lower","x":640,"y":430},"D-D":{"label":"Aisle D \u00b7 Lower","x":820,"y":430},"E-D":{"label":"Aisle E \u00b7 Lower","x":1000,"y":430},"A-S":{"label":"Aisle A \u00b7 South","x":280,"y":580},"B-S":{"label":"Aisle B \u00b7 South","x":460,"y":580},"C-S":{"label":"Aisle C \u00b7 South","x":640,"y":580},"D-S":{"label":"Aisle D \u00b7 South","x":820,"y":580},"E-S":{"label":"Aisle E \u00b7 South","x":1000,"y":580}},"segments":[{"a":"A-S","b":"A-D","state":"clear","source":"lidar_front","confidence":0.88},{"a":"A-D","b":"A-U","state":"clear","source":"warehouse_scanner","confidence":0.9},{"a":"A-U","b":"A-N","state":"clear","source":"default_map","confidence":0.58},{"a":"B-S","b":"B-D","state":"blocked","source":"lidar_front","confidence":0.95},{"a":"B-D","b":"B-U","state":"clear","source":"default_map","confidence":0.6},{"a":"B-U","b":"B-N","state":"clear","source":"default_map","confidence":0.55},{"a":"C-S","b":"C-D","state":"clear","source":"lidar_front","confidence":0.94},{"a":"C-D","b":"C-U","state":"clear","source":"warehouse_scanner","confidence":0.92},{"a":"C-U","b":"C-N","state":"clear","source":"warehouse_scanner","confidence":0.95},{"a":"D-S","b":"D-D","state":"clear","source":"warehouse_scanner","confidence":0.89},{"a":"D-D","b":"D-U","state":"blocked","source":"lidar_front","confidence":0.88},{"a":"D-U","b":"D-N","state":"clear","source":"default_map","confidence":0.6},{"a":"E-S","b":"E-D","state":"clear","source":"warehouse_scanner","confidence":0.91},{"a":"E-D","b":"E-U","state":"clear","source":"lidar_front","confidence":0.9},{"a":"E-U","b":"E-N","state":"clear","source":"warehouse_scanner","confidence":0.93},{"a":"A-S","b":"B-S","state":"clear","source":"warehouse_scanner","confidence":0.93},{"a":"B-S","b":"C-S","state":"clear","source":"warehouse_scanner","confidence":0.9},{"a":"C-S","b":"D-S","state":"clear","source":"warehouse_scanner","confidence":0.91},{"a":"D-S","b":"E-S","state":"clear","source":"warehouse_scanner","confidence":0.88},{"a":"A-D","b":"B-D","state":"clear","source":"warehouse_scanner","confidence":0.85},{"a":"B-D","b":"C-D","state":"clear","source":"warehouse_scanner","confidence":0.82},{"a":"C-D","b":"D-D","state":"clear","source":"default_map","confidence":0.6},{"a":"D-D","b":"E-D","state":"clear","source":"warehouse_scanner","confidence":0.87},{"a":"A-U","b":"B-U","state":"clear","source":"warehouse_scanner","confidence":0.86},{"a":"B-U","b":"C-U","state":"clear","source":"warehouse_scanner","confidence":0.84},{"a":"C-U","b":"D-U","state":"clear","source":"warehouse_scanner","confidence":0.88},{"a":"D-U","b":"E-U","state":"clear","source":"default_map","confidence":0.56},{"a":"A-N","b":"B-N","state":"clear","source":"default_map","confidence":0.55},{"a":"B-N","b":"C-N","state":"clear","source":"warehouse_scanner","confidence":0.9},{"a":"C-N","b":"D-N","state":"clear","source":"warehouse_scanner","confidence":0.92},{"a":"D-N","b":"E-N","state":"clear","source":"warehouse_scanner","confidence":0.89}],"shelves":[{"id":"WIDGET-42","near":"E-N","dx":46,"dy":-6,"target":true,"stock":[{"source":"erp_system","perspective":"third_party:erp","predicate":"count","value":50,"note":"synced yesterday"},{"source":"warehouse_scanner","perspective":"self","predicate":"count","value":48,"note":"09:00 today"},{"source":"sales_log","perspective":"third_party:sales","predicate":"shipped","value":3,"note":"shipped 12:15"}]},{"id":"BOLT-08","near":"A-U","dx":-46,"dy":0,"stock":[{"source":"warehouse_scanner","perspective":"self","predicate":"count","value":118,"note":"09:00 today"}]},{"id":"GEAR-30","near":"B-S","dx":46,"dy":0,"low":true,"stock":[{"source":"warehouse_scanner","perspective":"self","predicate":"count","value":9,"note":"09:00 today"}]},{"id":"PANEL-07","near":"D-S","dx":46,"dy":0,"stock":[{"source":"warehouse_scanner","perspective":"self","predicate":"count","value":41,"note":"09:00 today"}]},{"id":"ROTOR-12","near":"C-U","dx":46,"dy":0,"stock":[{"source":"warehouse_scanner","perspective":"self","predicate":"count","value":24,"note":"09:00 today"}]},{"id":"CABLE-55","near":"D-N","dx":-46,"dy":0,"low":true,"stock":[{"source":"warehouse_scanner","perspective":"self","predicate":"count","value":7,"note":"09:00 today"}]},{"id":"SCREW-02","near":"A-D","dx":46,"dy":0,"stock":[{"source":"warehouse_scanner","perspective":"self","predicate":"count","value":212,"note":"09:00 today"}]},{"id":"HINGE-21","near":"E-U","dx":46,"dy":0,"stock":[{"source":"warehouse_scanner","perspective":"self","predicate":"count","value":33,"note":"09:00 today"}]}]}
+;
+
+// ───────────────────────── project constants (mirror the Python code) ─────────────────────────
+// data/seed/initial_provenance.sql + warehouse/service.py _EXTRA_SOURCES
+const DEFAULT_SOURCES = {
+  default_map:       { trust: 0.6, decay: 0.00, perspective: "self",               label: "Floor map" },
+  warehouse_scanner: { trust: 0.9, decay: 0.00, perspective: "self",               label: "Floor scanner" },
+  lidar_front:       { trust: 0.9, decay: 0.30, perspective: "self",               label: "LiDAR" },
+  camera_front:      { trust: 0.7, decay: 0.40, perspective: "self",               label: "Camera" },
+  bot_02:            { trust: 0.5, decay: 0.10, perspective: "third_party:bot_02", label: "Maintenance bot 02" },
+  user:              { trust: 0.4, decay: 0.00, perspective: "user",               label: "Operator" },
+};
+// src/iagent/sensorimotor/sensors.py (distance-dependent LiDAR confidence)
+const LIDAR = { MAX_CONF: 0.95, MIN_CONF: 0.50, FULL_RANGE_CM: 50, MAX_RANGE_CM: 400 };
+const CM_PER_PX = 2;   // junction spacing 155–180 px → 310–360 cm segments
+const TRAVERSE_CONF = 0.95;   // driving through a segment is strong evidence it is clear
+
+function lidarConfidence(d) {
+  if (d <= LIDAR.FULL_RANGE_CM) return LIDAR.MAX_CONF;
+  if (d >= LIDAR.MAX_RANGE_CM) return LIDAR.MIN_CONF;
+  const frac = (d - LIDAR.FULL_RANGE_CM) / (LIDAR.MAX_RANGE_CM - LIDAR.FULL_RANGE_CM);
+  return Math.round((LIDAR.MAX_CONF - frac * (LIDAR.MAX_CONF - LIDAR.MIN_CONF)) * 1000) / 1000;
+}
+// src/iagent/declarative/decay.py
+function effectiveConfidence(stored, observedHour, nowHour, rate) {
+  const age = Math.max(0, nowHour - observedHour);
+  return rate <= 0 ? stored : Math.max(0, stored - rate * age);
+}
+
+// ───────────────────────── topology ─────────────────────────
+const segId = (a, b) => { const [lo, hi] = [a, b].sort(); return `seg:${lo}|${hi}`; };
+const SEGS = {}, ADJ = {};
+for (const s of WH.segments) {
+  const id = segId(s.a, s.b), ja = WH.junctions[s.a], jb = WH.junctions[s.b];
+  SEGS[id] = { id, a: s.a, b: s.b, lenCm: Math.round(Math.hypot(ja.x - jb.x, ja.y - jb.y) * CM_PER_PX) };
+  (ADJ[s.a] ||= []).push({ to: s.b, seg: id });
+  (ADJ[s.b] ||= []).push({ to: s.a, seg: id });
+}
+const SHELF_BY_ID = Object.fromEntries(WH.shelves.map(s => [s.id, s]));
+const shortSeg = id => id.replace("seg:", "").replace("|", " ↔ ");
+const destJunction = d => SHELF_BY_ID[d] ? SHELF_BY_ID[d].near : d;
+
+// ───────────────────────── state ─────────────────────────
+let scenario = null, log = [], startLog = [];
+let currentHour = 0, viewHour = 0, mode = "build";
+let selectedSeg = null, previewRoute = null, tab = "robot";
+let sources = structuredClone(DEFAULT_SOURCES);
+let settings = { rule: "product", avoid: 0.75, showTruth: false, explain: false, labels: true, groqKey: "", groqModel: "openai/gpt-oss-20b", useLLM: false };
+let ui = { dest: WH.goal, palSrc: "user", palConf: 0.7, logKind: "report", logState: "blocked", logSource: "user", logConf: 0.6, logPos: 50 };
+let lastAnswer = null, asking = false;
+let evSeq = 0;
+const newId = () => "e" + Date.now().toString(36) + (++evSeq);
+
+function presetWarehouse7() {
+  const beliefs = WH.segments.map(s => ({ seg: segId(s.a, s.b), state: s.state, source: s.source, conf: s.confidence, pos: 0.5 }));
+  const truth = {
+    "seg:B-D|B-S": { pos: 0.45, note: "crate (Scenario A)" },
+    "seg:D-D|D-U": { pos: 0.55, note: "pallet stack" },
+    "seg:C-D|D-D": { pos: 0.40, note: "hidden pallet — map says clear" },
+  };
+  for (const b of beliefs) if (truth[b.seg]) b.pos = truth[b.seg].pos;
+  return {
+    scenario: { robot: WH.start, truth, beliefs },
+    log: [
+      { id: "e1", hour: 2, kind: "world_remove", seg: "seg:B-D|B-S", note: "crate moved away (robot not told)" },
+      { id: "e2", hour: 3, kind: "world_add", seg: "seg:C-U|D-U", pos: 0.5, note: "forklift parks in upper cross-aisle" },
+      { id: "e3", hour: 3, kind: "report", seg: "seg:C-U|D-U", state: "blocked", source: "user", conf: 0.8, pos: 0.5, note: "operator: forklift parked there" },
+    ],
+  };
+}
+const presetEmpty = () => ({ scenario: { robot: WH.start, truth: {}, beliefs: [] }, log: [] });
+
+// ───────────────────────── simulation (pure replay of scenario + log) ─────────────────────────
+const perspectiveOf = src => (sources[src] || {}).perspective || "self";
+
+function simulate(H, opts = {}) {
+  const st = { hour: H, robot: scenario.robot, truth: structuredClone(scenario.truth), active: {}, history: {},
+               commits: {}, pending: [], uid: 0 };
+  for (const b of scenario.beliefs) writeBelief(st, { ...b, hour: 0, note: "hour-0 scenario" });
+  const evs = log.filter(e => e.hour <= H).map((e, i) => [e, i]).sort((x, y) => (x[0].hour - y[0].hour) || (x[1] - y[1])).map(x => x[0]);
+  let k = 0;
+  for (let h = 0; h <= H; h++) {
+    const pend = [];
+    while (k < evs.length && evs[k].hour === h) {
+      const e = evs[k++];
+      if (e.kind === "scan") pend.push({ hour: h, from: st.robot, readings: lidarRead(st, st.robot) });   // sensed now (sensorimotor layer)
+      else applyEvent(st, e);
+    }
+    if (h < H) { if (pend.length && opts.skipCommitAt !== h + 1) commitScans(st, pend, h + 1); }   // hour passed → write to declarative layer
+    else st.pending = pend;                                                                      // still this hour → pending
+  }
+  return st;
+}
+
+// Write pending LiDAR readings into the declarative layer at the start of hour `hour`.
+function commitScans(st, pend, hour) {
+  const rec = { hour, scans: [] };
+  for (const p of pend) {
+    for (const r of p.readings) writeBelief(st, { seg: r.seg, state: r.state, source: "lidar_front", conf: r.conf, hour, pos: r.pos, distCm: r.distCm, note: `LiDAR scan from ${p.from} (taken hour ${p.hour}): ${r.state === "blocked" ? `return at ${r.distCm} cm` : `nothing within ${r.distCm} cm`}` });
+    rec.scans.push({ from: p.from, scanHour: p.hour, readings: p.readings });
+  }
+  st.commits[hour] = rec;
+}
+
+function writeBelief(st, b) {
+  const persp = perspectiveOf(b.source);
+  const bySeg = (st.active[b.seg] ||= {});
+  const prev = bySeg[persp];
+  if (prev && prev.state === b.state) {
+    // Agreement: keep whichever is stronger now, so a weak confirmation never erodes a strong belief.
+    const prevEff = effectiveConfidence(prev.conf, prev.hour, b.hour, (sources[prev.source] || {}).decay || 0);
+    if (prevEff >= b.conf) {
+      if (prev.hour === b.hour && prev.source === b.source && prev.conf === b.conf) return prev;
+      (st.history[b.seg] ||= []).push({ ...b, perspective: persp, status: "confirmation", id: ++st.uid, note: (b.note ? b.note + " — " : "") + "agrees; stronger belief kept" });
+      return prev;
+    }
+  }
+  if (prev) { prev.status = prev.state !== b.state ? "downgraded" : "superseded"; prev.endedHour = b.hour; }
+  const entry = { ...b, perspective: persp, status: "active", id: ++st.uid };
+  bySeg[persp] = entry;
+  (st.history[b.seg] ||= []).push(entry);
+  return entry;
+}
+
+function applyEvent(st, e) {
+  switch (e.kind) {
+    case "world_add":    st.truth[e.seg] = { pos: e.pos ?? 0.5, note: e.note || "" }; break;
+    case "world_remove": delete st.truth[e.seg]; break;
+    case "report":       writeBelief(st, { seg: e.seg, state: e.state, source: e.source, conf: e.conf, hour: e.hour, pos: e.pos ?? 0.5, note: e.note || "logged change" }); break;
+    case "place": case "move": if (WH.junctions[e.to]) st.robot = e.to; break;   // reposition only (old "move" events replay the same way)
+    case "drive": break;                                                        // legacy events from older sessions are ignored
+  }
+}
+
+// 360° LiDAR sweep of the segments leaving the robot's junction. Reads only — storing happens at the next hour.
+function lidarRead(st, from) {
+  const out = [];
+  for (const { seg } of ADJ[from] || []) {
+    const S = SEGS[seg], t = st.truth[seg];
+    if (t) {
+      const d = Math.round(((from === S.a) ? t.pos : 1 - t.pos) * S.lenCm);
+      if (d <= LIDAR.MAX_RANGE_CM) { out.push({ seg, state: "blocked", conf: lidarConfidence(d), distCm: d, pos: t.pos }); continue; }
+    }
+    const reach = Math.min(S.lenCm, LIDAR.MAX_RANGE_CM);
+    out.push({ seg, state: "clear", conf: lidarConfidence(reach), distCm: reach });
+  }
+  return out;
+}
+
+// What the declarative layer says about a segment at hour `now`: the winning stored belief, decayed.
+function labelOf(st, seg, now) { const w = assess(st, seg, now).winner; return w ? { state: w.b.state, eff: w.eff, source: w.b.source } : null; }
+const labelText = l => l ? `${l.state} ${pct(l.eff)}` : "no belief";
+const sameLabel = (a, b) => (!a && !b) || (a && b && a.state === b.state && Math.round(a.eff * 100) === Math.round(b.eff * 100));
+
+// Compare the hour with and without the scan that was written at this hour.
+function scanContext(st) {
+  const commit = st.commits[st.hour];
+  if (!commit) return null;
+  const before = simulate(st.hour, { skipCommitAt: st.hour });
+  const segs = [...new Set(commit.scans.flatMap(s => s.readings.map(r => r.seg)))];
+  const rows = segs.map(seg => { const b = labelOf(before, seg, st.hour), a = labelOf(st, seg, st.hour); return { seg, before: b, after: a, changed: !sameLabel(b, a) }; });
+  const oldRoute = explainRoute(before, before.robot, ui.dest, st.hour), newRoute = explainRoute(st, st.robot, ui.dest, st.hour);
+  const routeChanged = (oldRoute.chosen?.segs.join() || "none") !== (newRoute.chosen?.segs.join() || "none");
+  return { commit, rows, changed: rows.filter(r => r.changed), oldRoute, newRoute, routeChanged };
+}
+
+// Combine every perspective on a segment into P(blocked) at hour `now`.
+function assess(st, seg, now) {
+  const rows = Object.values(st.active[seg] || {}).map(b => {
+    const src = sources[b.source] || { trust: 0.5, decay: 0 };
+    const eff = effectiveConfidence(b.conf, b.hour, now, src.decay);
+    return { b, eff, trust: src.trust, score: settings.rule === "product" ? src.trust * eff : src.trust, age: Math.max(0, now - b.hour) };
+  });
+  rows.sort((x, y) => (y.score - x.score) || (y.eff - x.eff) || (y.b.hour - x.b.hour));
+  const w = rows[0];
+  const p = !w ? 0.5 : (w.b.state === "blocked" ? 0.5 + 0.5 * w.eff : 0.5 - 0.5 * w.eff);
+  return { rows, winner: w || null, p };
+}
+
+function dijkstra(from, to, costFn) {
+  const dist = { [from]: 0 }, prev = {}, done = new Set(), pq = [[0, from]];
+  while (pq.length) {
+    pq.sort((a, b) => a[0] - b[0]);
+    const [d, u] = pq.shift();
+    if (done.has(u)) continue;
+    done.add(u);
+    if (u === to) break;
+    for (const { to: v, seg } of ADJ[u] || []) {
+      const c = costFn(seg);
+      if (c === null) continue;
+      const nd = d + c;
+      if (nd < (dist[v] ?? Infinity)) { dist[v] = nd; prev[v] = { u, seg }; pq.push([nd, v]); }
+    }
+  }
+  if (dist[to] === undefined) return null;
+  const path = [to], segs = [];
+  let cur = to;
+  while (cur !== from) { segs.unshift(prev[cur].seg); cur = prev[cur].u; path.unshift(cur); }
+  return { path, segs, cost: dist[to], lenCm: segs.reduce((a, s) => a + SEGS[s].lenCm, 0) };
+}
+
+function plan(st, from, to, now) {
+  const r = dijkstra(from, to, seg => { const { p } = assess(st, seg, now); return p >= settings.avoid ? null : (SEGS[seg].lenCm / 100) * (1 + 4 * p); });
+  if (!r) return null;
+  r.ps = r.segs.map(s => assess(st, s, now).p);
+  r.risk = 1 - r.ps.reduce((acc, p) => acc * (1 - p), 1);
+  return r;
+}
+
+// Structured "why this route" — used by the panel, the drive log and the agent.
+function geoDistances(src) {
+  const dist = { [src]: 0 }, done = new Set(), pq = [[0, src]];
+  while (pq.length) {
+    pq.sort((a, b) => a[0] - b[0]);
+    const [d, u] = pq.shift();
+    if (done.has(u)) continue; done.add(u);
+    for (const { to: v, seg } of ADJ[u] || []) { const nd = d + SEGS[seg].lenCm; if (nd < (dist[v] ?? Infinity)) { dist[v] = nd; pq.push([nd, v]); } }
+  }
+  return dist;
+}
+function explainRoute(st, from, dest, now) {
+  const to = destJunction(dest);
+  const chosen = from === to ? { path: [from], segs: [], lenCm: 0, risk: 0, ps: [] } : plan(st, from, to, now);
+  const dF = geoDistances(from), dT = geoDistances(to), minLen = dF[to] ?? 0;
+  // every segment that lies on at least one geometrically shortest route
+  const onShortest = Object.values(SEGS).filter(S => Math.min(dF[S.a] + S.lenCm + dT[S.b], dF[S.b] + S.lenCm + dT[S.a]) === minLen).map(S => S.id);
+  const ex = { from, dest, to, hour: now, chosen, minLenCm: minLen, detourCm: chosen ? chosen.lenCm - minLen : null, avoided: [], riskiest: null };
+  const riskOf = s => ({ seg: s, p: assess(st, s, now).p, reason: segReason(st, s, now) });
+  if (!chosen) { ex.blockers = onShortest.map(riskOf).filter(x => x.p >= settings.avoid).sort((a, b) => b.p - a.p); return ex; }
+  chosen.segs.forEach((s, i) => { if (!ex.riskiest || chosen.ps[i] > ex.riskiest.p) ex.riskiest = riskOf(s); });
+  const floor = Math.max(0.15, ex.riskiest ? ex.riskiest.p + 0.01 : 0);
+  ex.avoided = onShortest.filter(s => !chosen.segs.includes(s)).map(riskOf).filter(x => x.p >= floor).sort((a, b) => b.p - a.p);
+  return ex;
+}
+
+function segReason(st, seg, now) {
+  const a = assess(st, seg, now);
+  if (!a.winner) return "no belief on record — treated as 50/50 unknown";
+  const w = a.winner, b = w.b, lab = srcLabel(b.source);
+  let s = `${lab} says ${b.state} (${pct(b.conf)} at hour ${b.hour}, ${w.age} h old → ${pct(w.eff)} now)`;
+  if (w.eff === 0) s += " — fully decayed, so it now means “unknown”";
+  else if (b.state === "clear" && ["default_map", "user", "bot_02"].includes(b.source)) s += " — never verified by a sensor";
+  const losers = a.rows.slice(1).filter(r => r.b.state !== b.state);
+  if (losers.length) s += `; outweighs ${losers.map(r => `${srcLabel(r.b.source)}'s “${r.b.state}” (${pct(r.eff)})`).join(", ")}`;
+  return s;
+}
+
+function routeWhyHtml(ex) {
+  if (!ex) return "";
+  const m = cm => (cm / 100).toFixed(1) + " m";
+  if (ex.from === ex.to) return `<p>The robot is already at ${esc(ex.dest)}.</p>`;
+  if (!ex.chosen) {
+    return `<p><b>No route</b> to ${esc(ex.dest)} stays under the ${pct(settings.avoid)} avoid threshold.</p>` +
+      (ex.blockers?.length ? `<p>Every shortest route is cut by: ${ex.blockers.map(b => `<b>${shortSeg(b.seg)}</b> (${pct(b.p)} blocked — ${esc(b.reason)})`).join("; ")}.</p>` : "") +
+      `<p>Options: scan to refresh stale beliefs, wait for ghost boxes to fade, or raise the avoid threshold in Settings.</p>`;
+  }
+  const c = ex.chosen, parts = [];
+  parts.push(`<p><b>Chosen:</b> ${c.path.join(" → ")} — ${m(c.lenCm)}, ${pct(c.risk)} chance of meeting at least one obstacle (beliefs at hour ${ex.hour}).</p>`);
+  parts.push(ex.detourCm > 0
+    ? `<p><b>Detour:</b> ${m(ex.detourCm)} longer than the shortest possible route (${m(ex.minLenCm)}). The planner pays that extra distance to stay off riskier segments.</p>`
+    : `<p><b>No detour:</b> this is one of the shortest possible routes (${m(ex.minLenCm)}). Among routes of equal length it picks the one whose segments are most confidently clear.</p>`);
+  if (ex.avoided.length) parts.push(`<p><b>Steered around</b> (on other shortest routes): ${ex.avoided.slice(0, 4).map(a => `<b>${shortSeg(a.seg)}</b> ${pct(a.p)} blocked${a.p >= settings.avoid ? " — excluded" : ""} (${esc(a.reason)})`).join("; ")}.</p>`);
+  if (ex.riskiest) parts.push(`<p><b>Riskiest segment taken:</b> ${shortSeg(ex.riskiest.seg)} at ${pct(ex.riskiest.p)} — ${esc(ex.riskiest.reason)}.</p>`);
+  return parts.join("");
+}
+
+// ───────────────────────── helpers ─────────────────────────
+const pct = x => `${Math.round(x * 100)}%`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const tier = p => p < 0.35 ? "clear" : p > 0.65 ? "blocked" : "unknown";
+const srcLabel = s => sources[s]?.label || s;
+const perspColor = p => p === "self" ? "var(--ghost)" : p === "user" ? "var(--ghost-user)" : "var(--ghost-third)";
+const perspLabel = p => p === "self" ? "Robot (self)" : p === "user" ? "Operator (user)" : "Third party (" + p.split(":")[1] + ")";
+const isPast = () => mode === "run" && viewHour < currentHour;
+const clamp01 = x => Math.min(1, Math.max(0, isFinite(x) ? x : 0));
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), 2600); }
+
+function describeEvent(e) {
+  const S = e.seg ? shortSeg(e.seg) : "";
+  switch (e.kind) {
+    case "world_add": return `Real box placed on ${S}${e.note ? " — " + esc(e.note) : ""}`;
+    case "world_remove": return `Real box removed from ${S}${e.note ? " — " + esc(e.note) : ""}`;
+    case "report": return `${esc(srcLabel(e.source))} reports ${S} ${e.state} (${pct(e.conf)})${e.note ? " — " + esc(e.note) : ""}`;
+    case "scan": return `LiDAR scan from the robot's junction (written to memory at hour ${e.hour + 1})`;
+    case "place": case "move": return `Robot placed at ${esc(e.to)}`;
+    case "drive": return `(old drive command — ignored)`;
+  }
+  return e.kind;
+}
+
+// ───────────────────────── map ─────────────────────────
+const svg = document.getElementById("map"), NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs = {}, parent = svg) { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); parent.appendChild(n); return n; }
+function pointOn(seg, t) { const S = SEGS[seg], A = WH.junctions[S.a], B = WH.junctions[S.b]; return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t }; }
+let hoverLine = null;
+
+function renderMap(st) {
+  svg.innerHTML = "";
+  const now = viewHour, building = mode === "build";
+  const route = st ? explainRoute(st, st.robot, ui.dest, now) : null;
+  const routeSegs = new Set(route && route.chosen ? route.chosen.segs : []);
+  const ctx = st ? st.ctx : null;
+  const changed = new Map(ctx ? ctx.changed.map(r => [r.seg, r]) : []);
+  const pendingSegs = new Set(st ? st.pending.flatMap(p => p.readings.map(r => r.seg)) : []);
+  const oldSegs = ctx && ctx.routeChanged && ctx.oldRoute.chosen ? new Set(ctx.oldRoute.chosen.segs) : new Set();
+
+  for (const id of Object.keys(SEGS)) {
+    const S = SEGS[id], A = WH.junctions[S.a], B = WH.junctions[S.b];
+    let color, dash = "";
+    if (building) {
+      const b = scenario.beliefs.find(x => x.seg === id);
+      color = !b ? "var(--unknown)" : b.state === "blocked" ? "var(--blocked)" : "var(--clear)";
+      if (!b) dash = "6 5";
+    } else {
+      color = `var(--${tier(assess(st, id, now).p)})`;
+      if (!st.active[id] || !Object.keys(st.active[id]).length) dash = "6 5";
+    }
+    if (changed.has(id)) el("line", { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: "var(--warn)", "stroke-width": 22, "stroke-linecap": "round", opacity: 0.35 });
+    if (pendingSegs.has(id)) el("line", { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: "var(--accent)", "stroke-width": 18, "stroke-linecap": "round", "stroke-dasharray": "3 7", opacity: 0.6 });
+    if (oldSegs.has(id) && !routeSegs.has(id)) el("line", { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: "var(--ink-3)", "stroke-width": 10, "stroke-linecap": "round", "stroke-dasharray": "2 9", opacity: 0.8 });
+    if (routeSegs.has(id)) el("line", { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: "var(--robot)", "stroke-width": 14, "stroke-linecap": "round", opacity: 0.3 });
+    el("line", { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: color, "stroke-width": 5, "stroke-linecap": "round", "stroke-dasharray": dash, opacity: 0.9 });
+    if (id === selectedSeg) el("line", { x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: "var(--ink)", "stroke-width": 2, "stroke-dasharray": "2 4" });
+    const hit = el("line", { x1: A.x, y1: A.y, x2: B.x, y2: B.y, class: "seg-hit" });
+    hit.addEventListener("click", () => { selectedSeg = id; tab = "segment"; render(); });
+    el("title", {}, hit).textContent = shortSeg(id);
+  }
+
+  for (const sh of WH.shelves) {
+    const j = WH.junctions[sh.near], x = j.x + sh.dx, y = j.y + sh.dy;
+    const isDest = !building && sh.id === ui.dest;
+    const g = el("g", { style: "cursor:pointer" });
+    g.addEventListener("click", () => { if (!building) { ui.dest = sh.id; previewRoute = null; render(); } });
+    el("rect", { x: x - 30, y: y - 11, width: 60, height: 22, rx: 4, fill: "var(--shelf)", "fill-opacity": 0.95, stroke: isDest ? "var(--accent)" : "var(--line)", "stroke-width": isDest ? 2.5 : 1 }, g);
+    el("text", { x, y: y + 4, "text-anchor": "middle", "font-size": 10, "font-weight": 600, fill: "var(--ink-2)" }, g).textContent = sh.id;
+  }
+
+  // labels: the confidence stored in the declarative layer (winning belief, decayed to this hour)
+  if (!building && settings.labels) for (const id of Object.keys(SEGS)) {
+    const l = labelOf(st, id, now), ch = changed.get(id), m = pointOn(id, 0.5), vert = SEGS[id].a[0] === SEGS[id].b[0];
+    const col = !l ? "var(--ink-3)" : l.state === "blocked" ? "var(--blocked)" : "var(--clear)";
+    const txt = ch ? `${ch.before ? pct(ch.before.eff) : "—"}→${l ? pct(l.eff) : "—"}` : (l ? pct(l.eff) : "—");
+    const w = ch ? 62 : 36, q = vert ? { x: m.x + 18 + w / 2, y: m.y } : { x: m.x, y: m.y - 22 };
+    const g = el("g", { "pointer-events": "none" });
+    el("rect", { x: q.x - w / 2, y: q.y - 9, width: w, height: 18, rx: 9, fill: ch ? "var(--warn-bg)" : "var(--panel)", stroke: ch ? "var(--warn)" : col, "stroke-width": ch ? 2 : 1.2 }, g);
+    el("text", { x: q.x, y: q.y + 4, "text-anchor": "middle", "font-size": 10, "font-weight": 700, fill: col }, g).textContent = txt;
+  }
+
+  // ghost boxes = blocked beliefs, faded by decayed confidence (operator/third-party drawn in their own colour)
+  const ghosts = [];
+  if (building) for (const b of scenario.beliefs) { if (b.state === "blocked") ghosts.push({ seg: b.seg, b: { ...b, perspective: perspectiveOf(b.source), hour: 0 }, eff: b.conf, build: true }); }
+  else for (const [seg, byP] of Object.entries(st.active)) for (const b of Object.values(byP)) if (b.state === "blocked")
+    ghosts.push({ seg, b, eff: effectiveConfidence(b.conf, b.hour, now, (sources[b.source] || {}).decay || 0) });
+  const perSeg = {}, truthShown = (building || settings.showTruth) ? (building ? scenario.truth : st.truth) : {};
+  for (const g of ghosts) (perSeg[g.seg] ||= []).push(g);
+  for (const [seg, list] of Object.entries(perSeg)) list.forEach((gh, i) => {
+    const p = pointOn(seg, gh.b.pos ?? 0.5), off = (i - (list.length - 1) / 2) * 28 + (truthShown[seg] ? -22 : 0);
+    const vertical = SEGS[seg].a[0] === SEGS[seg].b[0];
+    const cx = p.x + (vertical ? off : 0), cy = p.y + (vertical ? 0 : off), c = perspColor(gh.b.perspective);
+    const g = el("g", { class: gh.build ? "dragable" : "", style: gh.build ? "" : "cursor:pointer" });
+    el("rect", { x: cx - 13, y: cy - 13, width: 26, height: 26, rx: 4, fill: c, "fill-opacity": (0.06 + 0.7 * gh.eff).toFixed(3), stroke: c, "stroke-width": 1.6, "stroke-dasharray": "4 3", opacity: Math.max(0.4, gh.eff).toFixed(3) }, g);
+    el("text", { x: cx, y: cy + 4, "text-anchor": "middle", "font-size": 10, "font-weight": 700, fill: "var(--ink)" }, g).textContent = Math.round(gh.eff * 100);
+    el("title", {}, g).textContent = `Ghost box — ${perspLabel(gh.b.perspective)} via ${srcLabel(gh.b.source)}: blocked, stored ${pct(gh.b.conf)}${building ? "" : `, ${now - gh.b.hour} h old → ${pct(gh.eff)} now`}${gh.build ? " (drag to move, drop on bin to remove)" : ""}`;
+    if (gh.build) makeDraggable(g, { kind: "belief", seg }, () => { selectedSeg = seg; tab = "segment"; render(); });
+    else g.addEventListener("click", () => { selectedSeg = seg; tab = "segment"; render(); });
+  });
+
+  // real boxes (ground truth): always visible while building, optional in the timeline
+  if (building || settings.showTruth) {
+    const truth = building ? scenario.truth : st.truth, canDrag = building || !isPast();
+    for (const [seg, t] of Object.entries(truth)) {
+      const p = pointOn(seg, t.pos);
+      const g = el("g", { class: canDrag ? "dragable" : "" });
+      el("rect", { x: p.x - 8, y: p.y - 8, width: 16, height: 16, rx: 2, fill: "var(--truth)" }, g);
+      el("title", {}, g).textContent = `Real box on ${shortSeg(seg)}${t.note ? " — " + t.note : ""}${canDrag ? " (drag to move, drop on bin to remove)" : ""}`;
+      if (canDrag) makeDraggable(g, { kind: "truth", seg }, () => { selectedSeg = seg; tab = "segment"; render(); });
+    }
+  }
+
+  for (const [id, j] of Object.entries(WH.junctions)) {
+    const isDest = !building && destJunction(ui.dest) === id;
+    const g = el("g", { style: "cursor:pointer" });
+    g.addEventListener("click", () => { if (building) { scenario.robot = id; persist(); render(); } else { ui.dest = id; previewRoute = null; render(); } });
+    el("circle", { cx: j.x, cy: j.y, r: 8, fill: "var(--panel)", stroke: isDest ? "var(--accent)" : "var(--ink-3)", "stroke-width": isDest ? 3 : 1.5 }, g);
+    el("text", { x: j.x + 11, y: j.y - 10, "font-size": 10, fill: "var(--ink-2)", stroke: "var(--floor)", "stroke-width": 3, "paint-order": "stroke" }, g).textContent = id;
+    el("title", {}, g).textContent = building ? `${j.label} — click to place the robot` : `${j.label} — click to set as destination`;
+  }
+
+  const rj = WH.junctions[building ? scenario.robot : st.robot];
+  const robotDrag = building || !isPast();
+  const rg = el("g", { class: robotDrag ? "dragable" : "" });
+  el("circle", { cx: rj.x, cy: rj.y, r: 12, fill: "var(--robot)", stroke: "#fff", "stroke-width": 2 }, rg);
+  el("text", { x: rj.x, y: rj.y + 4, "text-anchor": "middle", "font-size": 10, "font-weight": 700, fill: "#fff" }, rg).textContent = "R";
+  el("title", {}, rg).textContent = "Robot — drag to any junction to place it (no driving)";
+  if (robotDrag) makeDraggable(rg, { kind: "robot" }, null);
+
+  hoverLine = el("line", { x1: 0, y1: 0, x2: 0, y2: 0, stroke: "var(--accent)", "stroke-width": 10, "stroke-linecap": "round", opacity: 0, "pointer-events": "none" });
+}
+
+// ───────────────────────── drag & drop ─────────────────────────
+function svgPoint(clientX, clientY) {
+  const m = svg.getScreenCTM(); if (!m) return null;
+  const p = new DOMPoint(clientX, clientY).matrixTransform(m.inverse());
+  return { x: p.x, y: p.y };
+}
+function nearestSeg(pt) {
+  let best = null;
+  for (const id of Object.keys(SEGS)) {
+    const S = SEGS[id], A = WH.junctions[S.a], B = WH.junctions[S.b];
+    const dx = B.x - A.x, dy = B.y - A.y, L2 = dx * dx + dy * dy;
+    let t = ((pt.x - A.x) * dx + (pt.y - A.y) * dy) / L2; t = Math.max(0, Math.min(1, t));
+    const d = Math.hypot(pt.x - (A.x + dx * t), pt.y - (A.y + dy * t));
+    if (!best || d < best.d) best = { seg: id, t: Math.max(0.08, Math.min(0.92, t)), d };
+  }
+  return best && best.d <= 34 ? best : null;
+}
+function nearestJunction(pt) {
+  let best = null;
+  for (const [id, j] of Object.entries(WH.junctions)) { const d = Math.hypot(pt.x - j.x, pt.y - j.y); if (!best || d < best.d) best = { id, d }; }
+  return best && best.d <= 40 ? best.id : null;
+}
+const trash = document.getElementById("trash");
+function overTrash(cx, cy) { const r = trash.getBoundingClientRect(); return cx >= r.left - 6 && cx <= r.right + 6 && cy >= r.top - 6 && cy <= r.bottom + 6; }
+
+let drag = null;
+function startDrag(ev, payload, swatchClass, onClick) {
+  ev.preventDefault();
+  drag = { payload, x0: ev.clientX, y0: ev.clientY, moved: false, onClick, av: null, swatchClass };
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", onDragEnd, { once: true });
+}
+function onDragMove(ev) {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(ev.clientX - drag.x0, ev.clientY - drag.y0) < 5) return;
+  if (!drag.moved) {
+    drag.moved = true;
+    drag.av = document.createElement("div");
+    drag.av.className = "dragav sw-box " + drag.swatchClass;
+    if (drag.payload.kind === "robot") Object.assign(drag.av.style, { borderRadius: "50%", background: "var(--robot)" });
+    document.body.appendChild(drag.av);
+  }
+  drag.av.style.left = ev.clientX + "px"; drag.av.style.top = ev.clientY + "px";
+  trash.classList.toggle("hot", overTrash(ev.clientX, ev.clientY) && drag.payload.kind !== "robot" && !drag.payload.fromPalette);
+  const pt = svgPoint(ev.clientX, ev.clientY);
+  if (drag.payload.kind === "robot") {
+    const j = pt && nearestJunction(pt);
+    if (j && hoverLine) { const J = WH.junctions[j]; Object.assign(hoverLineAttrs(J.x, J.y, J.x, J.y)); hoverLine.setAttribute("opacity", 0.5); hoverLine.setAttribute("stroke-width", 30); }
+    else if (hoverLine) hoverLine.setAttribute("opacity", 0);
+    return;
+  }
+  const n = pt && nearestSeg(pt);
+  if (n && hoverLine) { const S = SEGS[n.seg], A = WH.junctions[S.a], B = WH.junctions[S.b]; hoverLineAttrs(A.x, A.y, B.x, B.y); hoverLine.setAttribute("stroke-width", 10); hoverLine.setAttribute("opacity", 0.35); }
+  else if (hoverLine) hoverLine.setAttribute("opacity", 0);
+}
+function hoverLineAttrs(x1, y1, x2, y2) { hoverLine.setAttribute("x1", x1); hoverLine.setAttribute("y1", y1); hoverLine.setAttribute("x2", x2); hoverLine.setAttribute("y2", y2); return {}; }
+function onDragEnd(ev) {
+  window.removeEventListener("pointermove", onDragMove);
+  const d = drag; drag = null;
+  trash.classList.remove("hot");
+  if (d.av) d.av.remove();
+  if (hoverLine) hoverLine.setAttribute("opacity", 0);
+  if (!d.moved) { if (d.onClick) d.onClick(); return; }
+  const pt = svgPoint(ev.clientX, ev.clientY);
+  dropPayload(d.payload, pt, overTrash(ev.clientX, ev.clientY));
+}
+function makeDraggable(g, payload, onClick) {
+  g.addEventListener("pointerdown", ev => startDrag(ev, payload, payload.kind === "truth" ? "sw-truth" : "sw-ghost", onClick));
+}
+
+// Apply a drop. Build mode edits the hour-0 scenario; timeline mode logs events at the current hour.
+function dropPayload(p, pt, toTrash) {
+  const building = mode === "build";
+  if (!building && isPast()) { toast("Viewing a past hour — go back to now to make changes."); return; }
+  if (p.kind === "robot") {
+    const j = pt && nearestJunction(pt);
+    if (!j) return;
+    if (building) scenario.robot = j;
+    else { log.push({ id: newId(), hour: currentHour, kind: "place", to: j }); toast(`Robot placed at ${j} — run a LiDAR scan to update the segments around it`); }
+    persist(); render();
+    return;
+  }
+  const n = toTrash ? null : (pt && nearestSeg(pt));
+  if (p.fromPalette) {
+    if (!n) return;
+    if (p.kind === "truth") {
+      if (building) scenario.truth[n.seg] = { pos: n.t, note: "" };
+      else log.push({ id: newId(), hour: currentHour, kind: "world_add", seg: n.seg, pos: n.t, note: "" });
+      toast(`Real box placed on ${shortSeg(n.seg)}${building ? "" : ` at hour ${currentHour} — the robot is not told`}`);
+    } else {
+      const state = p.kind === "ghost" ? "blocked" : "clear";
+      if (building) {
+        scenario.beliefs = scenario.beliefs.filter(b => b.seg !== n.seg);
+        scenario.beliefs.push({ seg: n.seg, state, source: ui.palSrc, conf: ui.palConf, pos: n.t });
+      } else log.push({ id: newId(), hour: currentHour, kind: "report", seg: n.seg, state, source: ui.palSrc, conf: ui.palConf, pos: n.t, note: "" });
+      toast(`${srcLabel(ui.palSrc)} says ${shortSeg(n.seg)} is ${state} (${pct(ui.palConf)})`);
+    }
+    selectedSeg = n.seg; tab = building ? "robot" : "segment";
+  } else if (p.kind === "truth") {
+    if (building) { const t = scenario.truth[p.seg]; delete scenario.truth[p.seg]; if (n) scenario.truth[n.seg] = { pos: n.t, note: t?.note || "" }; }
+    else {
+      log.push({ id: newId(), hour: currentHour, kind: "world_remove", seg: p.seg, note: n ? "moved" : "removed" });
+      if (n) log.push({ id: newId(), hour: currentHour, kind: "world_add", seg: n.seg, pos: n.t, note: "moved here" });
+    }
+    toast(n ? `Real box moved to ${shortSeg(n.seg)}` : `Real box removed from ${shortSeg(p.seg)}`);
+    if (n) selectedSeg = n.seg;
+  } else if (p.kind === "belief" && building) {
+    const b = scenario.beliefs.find(x => x.seg === p.seg);
+    scenario.beliefs = scenario.beliefs.filter(x => x.seg !== p.seg && (!n || x.seg !== n.seg));
+    if (n && b) scenario.beliefs.push({ ...b, seg: n.seg, pos: n.t });
+    toast(n ? `Ghost box moved to ${shortSeg(n.seg)}` : `Belief removed from ${shortSeg(p.seg)}`);
+    if (n) selectedSeg = n.seg;
+  }
+  previewRoute = null; persist(); render();
+}
+document.querySelectorAll(".tool").forEach(t => t.addEventListener("pointerdown", ev => {
+  const kind = t.dataset.tool;
+  startDrag(ev, { kind, fromPalette: true }, kind === "truth" ? "sw-truth" : kind === "ghost" ? "sw-ghost" : "sw-clear", () => toast("Drag it onto a segment on the map."));
+}));
+const palSrc = document.getElementById("palSrc"), palConf = document.getElementById("palConf");
+palSrc.onchange = () => { ui.palSrc = palSrc.value; persist(); };
+palConf.onchange = () => { ui.palConf = +palConf.value; persist(); };
+
+// ───────────────────────── agent tools (shared by the local agent and the LLM) ─────────────────────────
+function parseSeg(text) {
+  if (!text) return null;
+  const s = String(text);
+  const m = s.match(/seg:([A-E]-[NUDS])\|([A-E]-[NUDS])/i);
+  if (m) return SEGS[segId(m[1].toUpperCase(), m[2].toUpperCase())] ? segId(m[1].toUpperCase(), m[2].toUpperCase()) : null;
+  const js = [...s.matchAll(/\b([A-E])\s*-\s*([NUDS])\b/gi)].map(x => `${x[1].toUpperCase()}-${x[2].toUpperCase()}`);
+  for (let i = 0; i + 1 < js.length; i++) { const id = segId(js[i], js[i + 1]); if (SEGS[id]) return id; }
+  return null;
+}
+function findJunctions(text) { return [...String(text).matchAll(/\b([A-E])\s*-\s*([NUDS])\b/gi)].map(x => `${x[1].toUpperCase()}-${x[2].toUpperCase()}`); }
+function findShelf(text) { const m = String(text).toUpperCase().match(/\b([A-Z]+-\d{2})\b/g) || []; return m.find(x => SHELF_BY_ID[x]) || null; }
+function resolveDest(arg) { if (!arg) return null; const s = String(arg).trim(); if (SHELF_BY_ID[s.toUpperCase()]) return s.toUpperCase(); const j = findJunctions(s)[0]; return j && WH.junctions[j] ? j : (findShelf(s) || null); }
+
+const TOOLS = {
+  get_robot_state: { desc: "Current simulated hour, the robot's junction and the selected destination.", params: {},
+    run: (st) => ({ hour: viewHour, robot_at: st.robot, destination: ui.dest, pending_scans: st.pending.length }) },
+  last_scan: { desc: "LiDAR scans: any still pending this hour (not yet in memory), and the latest scan written to the declarative layer with each segment's stored rating before and after, plus whether the predicted route changed.", params: {},
+    run: (st) => {
+      const out = { pending: st.pending.map(p => ({ taken_hour: p.hour, from: p.from, commits_at_hour: p.hour + 1, readings: p.readings.map(r => ({ segment: r.seg, reading: r.state, distance_cm: r.distCm, lidar_confidence: r.conf })) })) };
+      const hrs = Object.keys(st.commits).map(Number).sort((a, b) => a - b), h = hrs[hrs.length - 1];
+      if (h !== undefined) {
+        const sub = simulate(h), c = scanContext(sub);
+        out.last_written = { written_at_hour: h, scans: c.commit.scans.map(s => ({ from: s.from, taken_hour: s.scanHour })),
+          ratings: c.rows.map(r => ({ segment: r.seg, before: labelText(r.before), after: labelText(r.after), changed: r.changed })),
+          route_to: ui.dest, route_before: c.oldRoute.chosen ? c.oldRoute.chosen.path.join(" → ") : "none", route_after: c.newRoute.chosen ? c.newRoute.chosen.path.join(" → ") : "none", route_changed: c.routeChanged };
+      }
+      return out;
+    } },
+  get_belief: { desc: "The winning belief about one aisle segment right now: P(blocked), winning source, its decayed confidence.", params: { segment: "segment, e.g. 'C-D|D-D'" },
+    run: (st, a) => { const seg = parseSeg(a.segment); if (!seg) return { error: "unknown segment " + a.segment }; const r = assess(st, seg, viewHour); return { segment: seg, p_blocked: +r.p.toFixed(3), verdict: tier(r.p), winner: r.winner ? { source: r.winner.b.source, perspective: r.winner.b.perspective, state: r.winner.b.state, stored_confidence: r.winner.b.conf, observed_hour: r.winner.b.hour, age_hours: r.winner.age, effective_confidence: +r.winner.eff.toFixed(3) } : null, reason: segReason(st, seg, viewHour) }; } },
+  query_perspective: { desc: "Every active belief about a segment, one per perspective (self / user / third_party), never merged.", params: { segment: "segment, e.g. 'C-D|D-D'" },
+    run: (st, a) => { const seg = parseSeg(a.segment); if (!seg) return { error: "unknown segment " + a.segment }; return { segment: seg, perspectives: assess(st, seg, viewHour).rows.map(r => ({ perspective: r.b.perspective, source: r.b.source, state: r.b.state, stored_confidence: r.b.conf, observed_hour: r.b.hour, age_hours: r.age, effective_confidence: +r.eff.toFixed(3), trust_prior: r.trust })) }; } },
+  query_provenance: { desc: "Full history of claims about a segment, oldest first, including superseded and downgraded ones.", params: { segment: "segment, e.g. 'C-D|D-D'" },
+    run: (st, a) => { const seg = parseSeg(a.segment); if (!seg) return { error: "unknown segment " + a.segment }; return { segment: seg, history: (st.history[seg] || []).map(b => ({ hour: b.hour, source: b.source, state: b.state, confidence: b.conf, status: b.status, note: b.note })) }; } },
+  list_sources: { desc: "Every source with its trust prior and decay rate per hour.", params: {},
+    run: () => Object.entries(sources).map(([k, v]) => ({ source: k, perspective: v.perspective, trust_prior: v.trust, decay_per_hour: v.decay })) },
+  list_ghost_blocks: { desc: "Every active 'blocked' belief (ghost box) with its decayed confidence now.", params: {},
+    run: (st) => Object.entries(st.active).flatMap(([seg, o]) => Object.values(o).filter(b => b.state === "blocked").map(b => { const eff = effectiveConfidence(b.conf, b.hour, viewHour, sources[b.source]?.decay || 0); return { segment: seg, source: b.source, perspective: b.perspective, stored_confidence: b.conf, observed_hour: b.hour, age_hours: viewHour - b.hour, effective_confidence: +eff.toFixed(3), counts_in_decision: assess(st, seg, viewHour).winner?.b.id === b.id }; })).sort((x, y) => y.effective_confidence - x.effective_confidence) },
+  explain_route: { desc: "Plan a route from the robot's position to a destination and explain it: chosen path, the geometric shortest path, and which segments were avoided and why.", params: { destination: "shelf id (e.g. WIDGET-42) or junction (e.g. D-D)" },
+    run: (st, a) => { const dest = resolveDest(a.destination) || ui.dest; const ex = explainRoute(st, st.robot, dest, viewHour); return { from: ex.from, destination: dest, chosen: ex.chosen ? { path: ex.chosen.path.join(" → "), length_m: ex.chosen.lenCm / 100, risk: +ex.chosen.risk.toFixed(3) } : null, shortest_possible_m: ex.minLenCm / 100, detour_m: ex.detourCm === null ? null : ex.detourCm / 100, steered_around: ex.avoided.map(x => ({ segment: x.seg, p_blocked: +x.p.toFixed(3), reason: x.reason })), riskiest_taken: ex.riskiest ? { segment: ex.riskiest.seg, p_blocked: +ex.riskiest.p.toFixed(3), reason: ex.riskiest.reason } : null, blockers: ex.blockers?.map(x => ({ segment: x.seg, p_blocked: +x.p.toFixed(3), reason: x.reason })), avoid_threshold: settings.avoid }; } },
+  recent_changes: { desc: "Logged changes and robot actions between two hours (inclusive). Real-world changes are marked hidden_from_robot.", params: { since_hour: "integer" },
+    run: (st, a) => { const h = Number.isFinite(+a.since_hour) ? +a.since_hour : Math.max(0, viewHour - 1); return log.filter(e => e.hour >= h && e.hour <= viewHour).map(e => ({ hour: e.hour, change: describeEvent(e).replace(/<[^>]+>/g, ""), hidden_from_robot: e.kind.startsWith("world_") })); } },
+};
+function runTool(st, name, args) { const t = TOOLS[name]; if (!t) return { error: "unknown tool " + name }; try { return t.run(st, args || {}); } catch (err) { return { error: String(err.message || err) }; } }
+
+// ───────────────────────── local grounded agent (no network) ─────────────────────────
+function localAgent(q, st) {
+  const steps = [], call = (name, args = {}) => { const obs = runTool(st, name, args); steps.push({ tool: name, args, obs }); return obs; };
+  const ql = q.toLowerCase(), seg = parseSeg(q), dest = findShelf(q) || (findJunctions(q).length === 1 ? findJunctions(q)[0] : null);
+  const robot = call("get_robot_state");
+  let html;
+  if (/\b(why|how come|explain)\b/.test(ql) && /(path|route|go|went|chose|choose|took|take|avoid|detour|way)/.test(ql) && !seg) {
+    const d = dest || ui.dest;
+    {
+      const ex = call("explain_route", { destination: d });
+      for (const a of (ex.steered_around || []).slice(0, 3)) call("query_perspective", { segment: a.segment });
+      call("list_sources");
+      html = routeWhyHtml(explainRoute(st, st.robot, d, viewHour)) + `<p class="muted">Preview only — this is the route I would take from ${st.robot} with what I believe at hour ${viewHour}.</p>`;
+    }
+  } else if (/scan/.test(ql) && /(change|show|find|found|result|did|what|learn)/.test(ql)) {
+    const s = call("last_scan"), parts = [];
+    if (s.pending.length) parts.push(`<p>I have ${s.pending.length === 1 ? "a scan" : s.pending.length + " scans"} from this hour that ${s.pending.length === 1 ? "is" : "are"} <b>not in memory yet</b> — ${s.pending.map(p => `from ${p.from}: ${p.readings.map(r => `${shortSeg(r.segment)} ${r.reading} (${pct(r.lidar_confidence)})`).join(", ")}`).join("; ")}. They're written to the declarative layer when the hour passes (hour ${s.pending[0].commits_at_hour}).</p>`);
+    if (s.last_written) {
+      const L = s.last_written, ch = L.ratings.filter(r => r.changed);
+      parts.push(`<p>The last scan written to memory was at hour ${L.written_at_hour} (taken ${L.scans.map(x => `from ${x.from} at hour ${x.taken_hour}`).join(", ")}). Stored ratings, before → after:</p><p>` +
+        L.ratings.map(r => `<b>${shortSeg(r.segment)}</b>: ${r.before} → <b>${r.after}</b>${r.changed ? "" : " <span class='muted'>(unchanged)</span>"}`).join("<br>") + `</p>`);
+      parts.push(ch.length ? `<p>${ch.length} rating${ch.length > 1 ? "s" : ""} changed.</p>` : `<p>The scan agreed with what I already had stored.</p>`);
+      parts.push(L.route_changed ? `<p>Predicted path to ${esc(L.route_to)} changed: ${L.route_before} ⟶ <b>${L.route_after}</b>.</p>` : `<p>Predicted path to ${esc(L.route_to)} unchanged: ${L.route_after}.</p>`);
+    }
+    html = parts.length ? parts.join("") : `<p>No LiDAR scan yet. Press “LiDAR scan here”, then continue to the next hour to write it into memory.</p>`;
+  } else if (seg) {
+    const b = call("get_belief", { segment: seg });
+    const pv = call("query_perspective", { segment: seg });
+    const hist = call("query_provenance", { segment: seg });
+    const parts = [`<p><b>${shortSeg(seg)}</b> is <b>${pct(b.p_blocked)}</b> likely blocked right now (hour ${viewHour}) — <span class="tag ${b.verdict}">${b.verdict}</span>.</p>`];
+    if (b.winner) parts.push(`<p>What decides it: ${esc(b.reason)} <span class="cite">${b.winner.source} · h${b.winner.observed_hour}</span></p>`);
+    else parts.push(`<p>I have no belief about it, so I treat it as 50/50 and would scan before using it.</p>`);
+    if (pv.perspectives.length > 1) parts.push(`<p>Perspectives, kept separate: ${pv.perspectives.map(r => `${perspLabel(r.perspective)} → ${r.state} (${pct(r.effective_confidence)} now)`).join("; ")}.</p>`);
+    const changed = hist.history.filter(h => h.status === "downgraded");
+    if (changed.length) parts.push(`<p>History: ${changed.map(h => `hour ${h.hour} ${srcLabel(h.source)} said ${h.state} — later contradicted`).join("; ")}.</p>`);
+    if (b.winner && b.winner.effective_confidence < 0.3) parts.push(`<p>That belief is stale (${b.winner.age_hours} h old). A LiDAR scan from ${SEGS[seg].a} or ${SEGS[seg].b} would settle it.</p>`);
+    html = parts.join("");
+  } else if (/(ghost|trust|which block|which box|stale|fresh)/.test(ql)) {
+    const gl = call("list_ghost_blocks");
+    if (!gl.length) html = `<p>There are no ghost boxes right now — no source currently claims any segment is blocked.</p>`;
+    else {
+      const strong = gl.filter(g => g.effective_confidence >= 0.6), faded = gl.filter(g => g.effective_confidence < 0.3);
+      html = `<p>${gl.length} ghost box${gl.length > 1 ? "es" : ""} at hour ${viewHour}:</p><p>` + gl.map(g => `<b>${shortSeg(g.segment)}</b> ${pct(g.effective_confidence)} (${srcLabel(g.source)}, ${g.age_hours} h old${g.counts_in_decision ? "" : ", outweighed"})`).join("<br>") + `</p>` +
+        (strong.length ? `<p>Trust: ${strong.map(g => shortSeg(g.segment)).join(", ")} — recent, high-confidence.</p>` : "") +
+        (faded.length ? `<p>Don't rely on: ${faded.map(g => shortSeg(g.segment)).join(", ")} — decayed below 30%, they may be gone. Scan to check.</p>` : "");
+    }
+  } else if (/(change|happen|new|since|update)/.test(ql)) {
+    const m = ql.match(/hour\s*(\d+)/), since = m ? +m[1] : Math.max(0, viewHour - 1);
+    const ch = call("recent_changes", { since_hour: since });
+    html = !ch.length ? `<p>Nothing was logged between hour ${since} and hour ${viewHour}.</p>` :
+      `<p>Since hour ${since}:</p><p>${ch.map(c => `h${c.hour}: ${esc(c.change)}${c.hidden_from_robot ? " <span class='muted'>(real world — I wasn't told)</span>" : ""}`).join("<br>")}</p>`;
+  } else if (/(where|position|location)/.test(ql)) {
+    html = `<p>I'm at <b>${robot.robot_at}</b> (${WH.junctions[robot.robot_at].label}) at hour ${viewHour}. I don't drive anywhere on my own — drag me to a junction to reposition me.</p>`;
+  } else if (/(route|path|go to|get to|how do i|best way)/.test(ql)) {
+    const d = dest || ui.dest; call("explain_route", { destination: d });
+    html = routeWhyHtml(explainRoute(st, st.robot, d, viewHour));
+  } else if (/(scan|check|verify)/.test(ql)) {
+    const around = (ADJ[st.robot] || []).map(x => ({ seg: x.seg, r: assess(st, x.seg, viewHour) }));
+    around.forEach(x => steps.push({ tool: "get_belief", args: { segment: x.seg }, obs: { p_blocked: +x.r.p.toFixed(3), reason: segReason(st, x.seg, viewHour) } }));
+    const unsure = around.filter(x => x.r.p > 0.3 && x.r.p < 0.7);
+    html = unsure.length ? `<p>Yes — around ${st.robot}, ${unsure.map(x => `${shortSeg(x.seg)} (${pct(x.r.p)})`).join(", ")} ${unsure.length > 1 ? "are" : "is"} uncertain. A scan would settle ${unsure.length > 1 ? "them" : "it"}.</p>` : `<p>Every segment around ${st.robot} is already confidently known; a scan would add little.</p>`;
+  } else {
+    const gl = call("list_ghost_blocks"); const ex = call("explain_route", { destination: ui.dest });
+    html = `<p>Hour ${viewHour}: I'm at <b>${st.robot}</b> with ${gl.length} ghost box${gl.length === 1 ? "" : "es"} on the map. Route to ${esc(ui.dest)}: ${ex.chosen ? ex.chosen.path + ` (${pct(ex.chosen.risk)} risk)` : "none under the avoid threshold"}.</p><p class="muted">Try: “why did you take that path?”, “is C-D to D-D blocked?”, “which ghost boxes can I trust?”, “what changed since hour 1?”.</p>`;
+  }
+  steps.push({ final: true });
+  return { q, html, steps, mode: "local", hour: viewHour };
+}
+
+// ───────────────────────── optional: live LLM via Groq tool-calling ─────────────────────────
+const SYSTEM_PROMPT = `You are AGV-1, a warehouse robot in Warehouse 7, answering the operator inside a simulation.
+Rules (from the I, Agent project):
+- Never assert a fact you have not verified with a tool. Call tools first.
+- Beliefs decay: effective confidence = stored - decay_rate * age_hours. A fully decayed belief means "unknown", not "clear".
+- Keep perspectives separate (self / user / third_party); never merge them.
+- Routes are previews only; the robot does not drive. When explaining a route, compare it with the shortest path and name the avoided segments with their P(blocked), source and age.
+- Real-world changes are hidden from you unless a LiDAR scan or a traversal revealed them.
+- Answer in 2-6 short sentences and cite sources like (lidar_front, hour 2).`;
+function toolSpecs() {
+  return Object.entries(TOOLS).map(([name, t]) => ({ type: "function", function: { name, description: t.desc,
+    parameters: { type: "object", properties: Object.fromEntries(Object.entries(t.params).map(([k, d]) => [k, { type: k === "since_hour" ? "integer" : "string", description: d }])), required: Object.keys(t.params) } } }));
+}
+async function llmAgent(q, st) {
+  const steps = [], messages = [{ role: "system", content: SYSTEM_PROMPT + `\nCurrent hour: ${viewHour}. Robot at ${st.robot}. Selected destination: ${ui.dest}.` }, { role: "user", content: q }];
+  for (let i = 0; i < 8; i++) {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + settings.groqKey },
+      body: JSON.stringify({ model: settings.groqModel, messages, tools: toolSpecs(), tool_choice: "auto", temperature: 0 }),
+    });
+    if (!res.ok) throw new Error(`Groq ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const msg = (await res.json()).choices?.[0]?.message;
+    if (!msg) throw new Error("empty response from Groq");
+    if (msg.tool_calls && msg.tool_calls.length) {
+      messages.push({ role: "assistant", content: msg.content || "", tool_calls: msg.tool_calls });
+      for (const tc of msg.tool_calls) {
+        let args = {}; try { args = JSON.parse(tc.function.arguments || "{}"); } catch (_) { args = {}; }
+        const obs = runTool(st, tc.function.name, args);
+        steps.push({ tool: tc.function.name, args, obs, thought: msg.content || "" });
+        messages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(obs) });
+      }
+      continue;
+    }
+    steps.push({ final: true });
+    return { q, html: mdLite(msg.content || "(no answer)"), steps, mode: "llm", hour: viewHour };
+  }
+  throw new Error("the model did not finish within 8 steps");
+}
+function mdLite(s) { return esc(s).split(/\n{2,}/).map(p => `<p>${p.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, '<span class="cite">$1</span>').replace(/\n/g, "<br>")}</p>`).join(""); }
+
+async function ask(q) {
+  q = (q || "").trim();
+  if (!q || asking || mode !== "run") { if (mode !== "run") toast("Start the timeline first."); return; }
+  asking = true; tab = "agent"; lastAnswer = { q, html: "<p class='muted'>Thinking…</p>", steps: [], mode: settings.useLLM ? "llm" : "local", hour: viewHour }; render();
+  const st = simulate(viewHour);
+  try {
+    if (settings.useLLM && settings.groqKey) lastAnswer = await llmAgent(q, st);
+    else lastAnswer = localAgent(q, st);
+  } catch (err) {
+    lastAnswer = localAgent(q, st);
+    lastAnswer.note = `Live model failed (${err.message}). Answered with the built-in agent instead.`;
+  }
+  asking = false; render();
+}
+const PILLS = [
+  { label: "Why this path?", q: "Why did you choose this path?" },
+  { label: "What did the scan change?", q: "What did the last scan change?" },
+  { label: "Which ghost boxes can I trust?", q: "Which ghost boxes can I trust right now?" },
+  { label: "What changed?", q: "What changed since the last hour?" },
+  { label: "Should I scan?", q: "Should I run a LiDAR scan here?" },
+];
+document.getElementById("pills").innerHTML = PILLS.map((p, i) => `<button class="pill" data-pill="${i}" title="${esc(p.q)}">${esc(p.label)}</button>`).join("");
+document.querySelectorAll("[data-pill]").forEach(b => b.onclick = () => { const p = PILLS[+b.dataset.pill]; document.getElementById("askInput").value = p.q; ask(p.q); });
+document.getElementById("btnAsk").onclick = () => ask(document.getElementById("askInput").value);
+document.getElementById("askInput").addEventListener("keydown", ev => { if (ev.key === "Enter") ask(ev.target.value); });
+
+// ───────────────────────── panels ─────────────────────────
+const panel = document.getElementById("panel");
+const sourceOptions = (sel, filter = () => true) => Object.entries(sources).filter(([k]) => filter(k)).map(([k, v]) => `<option value="${k}" ${k === sel ? "selected" : ""}>${esc(v.label)}</option>`).join("");
+const segOptions = sel => Object.keys(SEGS).map(id => `<option value="${id}" ${id === sel ? "selected" : ""}>${shortSeg(id)}</option>`).join("");
+const destOptions = sel => `<optgroup label="Shelves">${WH.shelves.map(s => `<option value="${s.id}" ${s.id === sel ? "selected" : ""}>${s.id}</option>`).join("")}</optgroup><optgroup label="Junctions">${Object.keys(WH.junctions).map(j => `<option value="${j}" ${j === sel ? "selected" : ""}>${j}</option>`).join("")}</optgroup>`;
+function dirGlyph(from, to) { const a = WH.junctions[from], b = WH.junctions[to]; return b.x > a.x ? "→" : b.x < a.x ? "←" : b.y < a.y ? "↑" : "↓"; }
+
+function renderTabs() {
+  const tabsEl = document.getElementById("tabs");
+  const list = mode === "build" ? [["robot", "Build"], ["segment", "Segment"], ["settings", "Sources"]] :
+    [["robot", "Robot"], ["agent", "Ask" + (lastAnswer ? " ●" : "")], ["segment", "Segment"], ["timeline", "Timeline"], ["settings", "Settings"]];
+  if (!list.some(([k]) => k === tab)) tab = "robot";
+  tabsEl.innerHTML = list.map(([k, l]) => `<button class="tab ${k === tab ? "active" : ""}" data-tab="${k}">${l}</button>`).join("");
+  tabsEl.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
+}
+
+function renderBuild() {
+  const nB = scenario.beliefs.filter(x => x.state === "blocked").length;
+  return `<section>
+      <h2>Build the hour-0 scenario</h2>
+      <div class="row"><button id="pWh7">Load Warehouse 7 preset</button><button id="pEmpty">Empty floor</button></div>
+      <p class="hint"><b>Drag</b> a <b>real box</b> (what is actually there) or a <b>ghost box</b> (what a source reports — the robot's belief) from the bar above onto any segment. Drag boxes along a segment to move them, or onto the bin to remove them. Drag the robot <b>R</b> to a junction to choose where it starts.</p>
+      <div class="stat" style="margin-top:8px">
+        <span>Robot starts at</span><b>${scenario.robot}</b>
+        <span>Beliefs at hour 0</span><b>${scenario.beliefs.length} (${nB} ghost boxes)</b>
+        <span>Real boxes at hour 0</span><b>${Object.keys(scenario.truth).length}</b>
+        <span>Scheduled changes</span><b>${log.length}</b>
+      </div>
+    </section>
+    <section><button class="primary" id="btnStart">Start timeline at hour 0 ▸</button><p class="hint">Then: continue hour by hour, drag in new boxes, scan, preview routes and ask the robot why.</p></section>`;
+}
+
+function renderRobot(st) {
+  const past = isPast(), dis = past ? "disabled" : "";
+  const here = WH.junctions[st.robot], opts = (ADJ[st.robot] || []).map(({ to, seg }) => {
+    const a = assess(st, seg, viewHour), conf = 1 - a.p, t = conf >= 0.8 ? "high" : conf >= 0.4 ? "medium" : "low";
+    const w = a.winner, short = !w ? "No belief — unknown" : w.b.state === "blocked" ? (a.p >= settings.avoid ? "Ghost box — avoid" : "Ghost box, faded — uncertain") :
+      (["lidar_front", "warehouse_scanner", "camera_front"].includes(w.b.source) ? (w.eff >= 0.6 ? "Clear — sensor-confirmed" : "Clear — but sensor reading is stale") : "Map/report only — unverified");
+    return { to, seg, a, conf, t, short };
+  }).sort((x, y) => y.conf - x.conf);
+  const ex = explainRoute(st, st.robot, ui.dest, viewHour), nextOnRoute = ex.chosen?.path[1];
+  const ctx = st.ctx, pend = st.pending;
+  const lastHr = Object.keys(st.commits).map(Number).sort((a, b) => a - b).pop();
+  const memNow = seg => labelText(labelOf(st, seg, viewHour));
+  const tagOf = l => l ? `<span class="tag ${l.state}">${l.state}</span> ${pct(l.eff)}` : `<span class="tag unknown">none</span>`;
+  return `<section>
+      ${past ? `<p class="past-note">Viewing hour ${viewHour} (read-only). Use “Back to now” to act.</p>` : ""}
+      <div class="here"><span class="pin">R</span><span><small>AGV-1 at hour ${viewHour}</small><b>${esc(here.label)}</b> (${st.robot})</span></div>
+      <div class="row"><button class="primary" id="btnScan" ${dis}>LiDAR scan here</button><button id="btnNext" ${dis} class="${pend.length ? "primary" : ""}">Continue to hour ${currentHour + 1} ▸${pend.length ? " (writes scan to memory)" : ""}</button></div>
+      <p class="hint">Map labels show what the <b>declarative layer</b> stores (winning belief, decayed to this hour). A scan is sensed now and written to memory when the hour passes. Drag <b>R</b> to scan from another junction.</p>
+    </section>
+    ${pend.length ? `<section>
+      <h2>Pending scan · not in memory yet</h2>
+      ${pend.map(p => `<p class="hint">Taken at hour ${p.hour} from <b>${p.from}</b> — written to memory at hour ${p.hour + 1}.</p>
+      <table><tr><th>Segment</th><th>LiDAR reading</th><th>Stored now</th></tr>
+      ${p.readings.map(r => `<tr><td>${shortSeg(r.seg)}</td><td><span class="tag ${r.state}">${r.state}</span> ${pct(r.conf)}<br><span class="muted">${r.state === "blocked" ? `return at ${r.distCm} cm` : `nothing within ${r.distCm} cm`}</span></td><td>${esc(memNow(r.seg))}</td></tr>`).join("")}</table>`).join("")}
+    </section>` : ""}
+    ${ctx ? `<section>
+      <h2>Scan written to memory at hour ${ctx.commit.hour}</h2>
+      <p class="hint">${ctx.commit.scans.map(s => `Scan from <b>${s.from}</b>, taken at hour ${s.scanHour}`).join("; ")}. <b>${ctx.changed.length}</b> stored rating${ctx.changed.length === 1 ? "" : "s"} changed (highlighted in amber on the map).</p>
+      <table><tr><th>Segment</th><th>Before</th><th>After</th></tr>
+      ${ctx.rows.map(r => `<tr class="${r.changed ? "winner" : ""}"><td>${shortSeg(r.seg)}${r.changed ? " <b>●</b>" : ""}</td><td>${tagOf(r.before)}</td><td>${tagOf(r.after)}</td></tr>`).join("")}</table>
+      <h3>Predicted path to ${esc(ui.dest)}</h3>
+      ${ctx.routeChanged
+        ? `<p class="hint"><b>Changed.</b> Before: ${ctx.oldRoute.chosen ? ctx.oldRoute.chosen.path.join(" → ") : "no route"} (grey dotted on the map)<br>Now: <b>${ctx.newRoute.chosen ? ctx.newRoute.chosen.path.join(" → ") : "no route"}</b> (blue)</p>`
+        : `<p class="hint">Unchanged: ${ctx.newRoute.chosen ? ctx.newRoute.chosen.path.join(" → ") : "no route"}.</p>`}
+    </section>` : (!pend.length ? `<section><h2>LiDAR scan</h2><p class="muted">${lastHr !== undefined ? `Last scan was written to memory at hour ${lastHr}. Scrub to that hour to see what it changed.` : "No scan yet. Press “LiDAR scan here”, then continue to the next hour to write it into memory."}</p></section>` : "")}
+    <section>
+      <h2>Route preview</h2>
+      <div class="row"><label>To <select id="dest">${destOptions(ui.dest)}</select></label><span class="muted">or click a shelf / junction on the map</span></div>
+      <div class="why">${routeWhyHtml(ex)}</div>
+      <p class="hint">Preview only: the blue route is what the robot <i>would</i> take from ${st.robot} given its beliefs at hour ${viewHour}. It updates after every scan, change or hour.</p>
+    </section>
+    <section>
+      <h2>Segments from ${st.robot} — scored on grounded confidence</h2>
+      ${opts.map(o => `<button class="opt" data-opt="${o.seg}">
+        <div class="opt-top"><span class="opt-dir">${dirGlyph(st.robot, o.to)}</span><span class="opt-name">${esc(WH.junctions[o.to].label)} ${o.to === nextOnRoute ? "<small>· on route</small>" : ""}</span><span class="opt-conf tier-${o.t}">${pct(o.conf)}</span></div>
+        <div class="opt-bar"><i class="bar-${o.t}" style="width:${(o.conf * 100).toFixed(0)}%"></i></div>
+        <div class="opt-reason">${/avoid/.test(o.short) ? "✗" : /confirmed/.test(o.short) ? "✓" : "⚠"} ${o.short}</div>
+        ${settings.explain ? `<div class="opt-why">${esc(segReason(st, o.seg, viewHour))}</div>` : ""}
+      </button>`).join("")}
+      <p class="hint">Click one to inspect it. Turn on <b>Explain</b> for the full reasoning.</p>
+    </section>`;
+}
+
+function renderAgent() {
+  const a = lastAnswer;
+  const modeLine = settings.useLLM && settings.groqKey ? `Live model (${esc(settings.groqModel)}) via Groq, using the same tools.` : "Built-in grounded agent — answers only from the beliefs, history and route planner. Add a Groq key in Settings for a live model.";
+  if (!a) return `<section><h2>Ask the robot</h2><p class="hint">Use the ask bar under the map. ${modeLine}</p></section>`;
+  return `<section>
+      <div class="answer"><div class="q">“${esc(a.q)}”</div>${a.html}</div>
+      ${a.note ? `<p class="err">${esc(a.note)}</p>` : ""}
+      <p class="muted">${a.mode === "llm" ? "Answered by the live model" : "Answered by the built-in agent"} at hour ${a.hour}.</p>
+    </section>
+    <section><h2>Reasoning trace</h2><p class="hint">Every tool call that grounded the answer — same tool names as the project's ReAct loop.</p>
+      ${a.steps.map((s, i) => s.final ? `<div class="step"><div class="step-h"><span class="step-i">#${i + 1}</span><span class="step-tag fa">final_answer</span></div></div>` :
+        `<div class="step"><div class="step-h"><span class="step-i">#${i + 1}</span><span class="step-tag tc">tool_call</span><code>${esc(s.tool)}</code></div>
+          ${s.thought ? `<div class="muted">💭 ${esc(s.thought)}</div>` : ""}
+          <pre>${esc(JSON.stringify(s.args))}</pre><div class="muted" style="margin-top:4px">observation</div><pre>${esc(JSON.stringify(s.obs, null, 2))}</pre></div>`).join("")}
+    </section>`;
+}
+
+function renderSegment(st) {
+  if (!selectedSeg) return `<section><p class="muted">Click a segment or box on the map.</p></section>`;
+  const seg = selectedSeg;
+  if (mode === "build") {
+    const b = scenario.beliefs.find(x => x.seg === seg), t = scenario.truth[seg];
+    return `<section><h2>${shortSeg(seg)} · ${SEGS[seg].lenCm} cm</h2>
+      <h3>Robot's belief at hour 0</h3>
+      <div class="row"><select id="bState"><option value="none" ${!b ? "selected" : ""}>No belief</option><option value="clear" ${b?.state === "clear" ? "selected" : ""}>Clear</option><option value="blocked" ${b?.state === "blocked" ? "selected" : ""}>Blocked (ghost box)</option></select>
+      <select id="bSource" ${!b ? "disabled" : ""}>${sourceOptions(b?.source || "default_map")}</select>
+      <label>conf <input type="number" id="bConf" min="0" max="1" step="0.05" value="${b?.conf ?? 0.6}" ${!b ? "disabled" : ""}></label></div>
+      <h3>Real world at hour 0</h3>
+      <p>${t ? `A real box at ${Math.round(t.pos * 100)}% along from ${SEGS[seg].a}. Drag it on the map to move or remove it.` : "Nothing really here. Drag a real box from the bar to add one."}</p></section>`;
+  }
+  const a = assess(st, seg, viewHour), t = st.truth[seg], hist = (st.history[seg] || []).slice().reverse();
+  return `<section><h2>${shortSeg(seg)} · ${SEGS[seg].lenCm} cm</h2>
+    <div class="row" style="justify-content:space-between"><span>P(blocked) at hour ${viewHour}: <b>${pct(a.p)}</b> <span class="tag ${tier(a.p)}">${tier(a.p)}</span></span>${settings.showTruth ? `<span class="muted">Really: <b>${t ? "box" : "clear"}</b></span>` : ""}</div>
+    <div class="p-bar"><i style="left:calc(${(a.p * 100).toFixed(1)}% - 1px)"></i></div>
+    <p class="hint">${esc(segReason(st, seg, viewHour))}</p>
+    <h3>Active beliefs, one per perspective</h3>
+    ${a.rows.length ? `<table><tr><th>Perspective</th><th>Claim</th><th>Stored</th><th>Age</th><th>Now</th><th>Trust</th></tr>${a.rows.map(r => `<tr class="${a.winner && r.b.id === a.winner.b.id ? "winner" : ""}"><td>${perspLabel(r.b.perspective)}<br><span class="muted">${esc(srcLabel(r.b.source))}</span></td><td><span class="tag ${r.b.state}">${r.b.state}</span></td><td>${pct(r.b.conf)}</td><td>${r.age} h</td><td><b>${pct(r.eff)}</b></td><td>${r.trust}</td></tr>`).join("")}</table>` : `<p class="muted">No belief — treated as 50% unknown.</p>`}
+    <div class="row"><button class="small" id="btnAskSeg">Ask the robot about this segment</button></div>
+    <h3>History</h3>
+    ${hist.length ? `<table><tr><th>Hour</th><th>Source</th><th>Claim</th><th>Status</th></tr>${hist.map(b => `<tr class="${b.status === "superseded" || b.status === "downgraded" ? "inactive" : ""}"><td>${b.hour}</td><td>${esc(srcLabel(b.source))}</td><td>${b.state} ${pct(b.conf)}<br><span class="muted">${esc(b.note || "")}</span></td><td>${b.status}${b.endedHour !== undefined ? " @h" + b.endedHour : ""}</td></tr>`).join("")}</table>` : `<p class="muted">No history.</p>`}
+  </section>`;
+}
+
+function renderTimeline() {
+  const dis = isPast() ? "disabled" : "";
+  return `<section><h2>Timeline</h2>
+      <ul class="log">${log.length ? log.map((e, i) => [e, i]).sort((x, y) => (x[0].hour - y[0].hour) || (x[1] - y[1])).map(([e]) => `<li class="${e.hour > currentHour ? "future" : ""}"><span class="h">h${e.hour}</span><span class="d">${describeEvent(e)}${e.hour > currentHour ? " (scheduled)" : ""}</span><button class="small" data-del="${e.id}" ${e.hour < currentHour ? "disabled title='Already in the past'" : ""}>✕</button></li>`).join("") : `<li class="muted">Nothing logged yet.</li>`}</ul>
+      <div class="row"><button class="small" id="btnEdit">Edit hour-0 scenario</button><button class="small" id="btnClear">Clear timeline</button></div></section>
+    <section><details><summary>Precise entry (instead of dragging)</summary>
+      <div class="row"><label><input type="radio" name="lk" value="report" ${ui.logKind === "report" ? "checked" : ""}> Report (belief)</label><label><input type="radio" name="lk" value="world" ${ui.logKind === "world" ? "checked" : ""}> Real world</label></div>
+      <div class="row"><select id="lSeg" ${dis}>${segOptions(selectedSeg)}</select></div>
+      ${ui.logKind === "report" ? `<div class="row"><select id="lState" ${dis}><option value="blocked" ${ui.logState === "blocked" ? "selected" : ""}>blocked</option><option value="clear" ${ui.logState === "clear" ? "selected" : ""}>clear</option></select><select id="lSrc" ${dis}>${sourceOptions(ui.logSource, k => k !== "lidar_front")}</select><label>conf <input type="number" id="lConf" min="0" max="1" step="0.05" value="${ui.logConf}" ${dis}></label></div>`
+        : `<div class="row"><select id="lWorld" ${dis}><option value="add">Box appears</option><option value="remove">Box removed</option></select></div>`}
+      <div class="row"><input type="text" id="lNote" placeholder="note (optional)" style="flex:1" ${dis}><button id="btnLog" ${dis}>Log at hour ${currentHour}</button></div>
+    </details></section>`;
+}
+
+function renderSettings() {
+  return `${mode === "run" ? `<section><h2>Decision rules</h2>
+      <div class="row"><label>Conflict rule <select id="rule"><option value="product" ${settings.rule === "product" ? "selected" : ""}>trust × decayed confidence</option><option value="trust" ${settings.rule === "trust" ? "selected" : ""}>trust prior only (current project rule)</option></select></label></div>
+      <div class="row"><label>Avoid segments with P(blocked) ≥ <input type="number" id="avoid" min="0.5" max="1" step="0.05" value="${settings.avoid}"></label></div>
+      <p class="hint">P(blocked) = 50% ± half the winning belief's decayed confidence. Fully decayed = unknown, not clear.</p></section>
+    <section><h2>Live model (optional)</h2>
+      <div class="row"><label><input type="checkbox" id="useLLM" ${settings.useLLM ? "checked" : ""}> Answer questions with a live model on Groq</label></div>
+      <div class="row"><input type="password" id="groqKey" placeholder="gsk_… (stored only in this browser)" value="${esc(settings.groqKey)}" style="flex:1"></div>
+      <div class="row"><label>Model <input type="text" id="groqModel" value="${esc(settings.groqModel)}" style="width:200px"></label></div>
+      <p class="hint">The model gets the same tools as the built-in agent (get_belief, query_perspective, explain_route, …) and must call them before answering. If the call fails, the built-in agent answers instead.</p></section>` : ""}
+    <section><h2>Sources · trust and decay per hour</h2>
+      <table><tr><th>Source</th><th>Persp.</th><th>Trust</th><th>Decay/h</th></tr>${Object.entries(sources).map(([k, v]) => `<tr><td>${esc(v.label)}<br><span class="muted">${k}</span></td><td>${v.perspective}</td><td><input type="number" min="0" max="1" step="0.05" value="${v.trust}" data-src="${k}" data-f="trust"></td><td><input type="number" min="0" max="1" step="0.05" value="${v.decay}" data-src="${k}" data-f="decay"></td></tr>`).join("")}</table>
+      <div class="row"><button class="small" id="btnResetSrc">Reset to project defaults</button></div>
+      <p class="hint">Defaults from <code>initial_provenance.sql</code>. The floor scanner never decays in the project; try 0.1.</p></section>`;
+}
+
+function wire(st) {
+  const on = (id, ev, fn) => { const n = document.getElementById(id); if (n) n[ev] = fn; };
+  on("pWh7", "onclick", () => { const p = presetWarehouse7(); scenario = p.scenario; log = p.log; selectedSeg = null; persist(); render(); });
+  on("pEmpty", "onclick", () => { const p = presetEmpty(); scenario = p.scenario; log = p.log; selectedSeg = null; persist(); render(); });
+  on("btnStart", "onclick", () => { startLog = structuredClone(log); mode = "run"; currentHour = 0; viewHour = 0; previewRoute = null; tab = "robot"; persist(); render(); });
+  on("btnNext", "onclick", nextHour);
+  on("btnScan", "onclick", () => { log.push({ id: newId(), hour: currentHour, kind: "scan" }); persist(); render(); toast(`Scan taken from ${simulate(viewHour).robot} — it goes into memory when you continue to hour ${currentHour + 1}`); });
+  document.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => { selectedSeg = b.dataset.opt; tab = "segment"; render(); });
+  on("dest", "onchange", ev => { ui.dest = ev.target.value; previewRoute = null; render(); });
+
+  on("btnAskSeg", "onclick", () => { const q = `Is ${shortSeg(selectedSeg).replace(" ↔ ", " to ")} blocked?`; document.getElementById("askInput").value = q; ask(q); });
+  // build-mode segment editor
+  const sState = document.getElementById("bState");
+  if (sState) {
+    const sSrc = document.getElementById("bSource"), sConf = document.getElementById("bConf");
+    const save = () => { const old = scenario.beliefs.find(x => x.seg === selectedSeg); scenario.beliefs = scenario.beliefs.filter(x => x.seg !== selectedSeg);
+      if (sState.value !== "none") scenario.beliefs.push({ seg: selectedSeg, state: sState.value, source: sSrc.value, conf: clamp01(+sConf.value), pos: old?.pos ?? scenario.truth[selectedSeg]?.pos ?? 0.5 }); persist(); render(); };
+    sState.onchange = save; sSrc.onchange = save; sConf.onchange = save;
+  }
+  // timeline
+  document.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { log = log.filter(e => e.id !== b.dataset.del); persist(); render(); });
+  on("btnEdit", "onclick", () => { mode = "build"; previewRoute = null; tab = "robot"; persist(); render(); });
+  on("btnClear", "onclick", () => { const b = document.getElementById("btnClear"); if (b.dataset.armed) { log = []; currentHour = 0; viewHour = 0; lastAnswer = null; persist(); render(); } else { b.dataset.armed = "1"; b.textContent = "Click again to clear"; } });
+  document.querySelectorAll("input[name=lk]").forEach(r => r.onchange = () => { ui.logKind = r.value; render(); });
+  on("lSeg", "onchange", ev => { selectedSeg = ev.target.value; });
+  on("lState", "onchange", ev => { ui.logState = ev.target.value; });
+  on("lSrc", "onchange", ev => { ui.logSource = ev.target.value; });
+  on("lConf", "onchange", ev => { ui.logConf = clamp01(+ev.target.value); });
+  on("btnLog", "onclick", () => {
+    const seg = document.getElementById("lSeg").value, note = document.getElementById("lNote").value.trim(), base = { id: newId(), hour: currentHour, seg, note };
+    if (ui.logKind === "report") log.push({ ...base, kind: "report", state: ui.logState, source: ui.logSource, conf: ui.logConf, pos: 0.5 });
+    else if (document.getElementById("lWorld").value === "add") log.push({ ...base, kind: "world_add", pos: 0.5 });
+    else log.push({ ...base, kind: "world_remove" });
+    selectedSeg = seg; persist(); render();
+  });
+  // settings
+  on("rule", "onchange", ev => { settings.rule = ev.target.value; previewRoute = null; persist(); render(); });
+  on("avoid", "onchange", ev => { settings.avoid = Math.min(1, Math.max(0.5, +ev.target.value)); previewRoute = null; persist(); render(); });
+  on("useLLM", "onchange", ev => { settings.useLLM = ev.target.checked; persist(); render(); });
+  on("groqKey", "onchange", ev => { settings.groqKey = ev.target.value.trim(); persist(); render(); });
+  on("groqModel", "onchange", ev => { settings.groqModel = ev.target.value.trim() || "openai/gpt-oss-20b"; persist(); });
+  document.querySelectorAll("[data-src]").forEach(inp => inp.onchange = () => { sources[inp.dataset.src][inp.dataset.f] = clamp01(+inp.value); previewRoute = null; persist(); render(); });
+  on("btnResetSrc", "onclick", () => { sources = structuredClone(DEFAULT_SOURCES); persist(); render(); });
+}
+
+// ───────────────────────── header & render ─────────────────────────
+const scrub = document.getElementById("scrub");
+scrub.oninput = () => { viewHour = +scrub.value; previewRoute = null; render(); };
+document.getElementById("btnNow").onclick = () => { viewHour = currentHour; previewRoute = null; render(); };
+document.getElementById("btnNextHdr").onclick = () => nextHour();
+const btnReset = document.getElementById("btnReset");
+btnReset.onclick = () => {
+  if (!btnReset.dataset.armed) {
+    btnReset.dataset.armed = "1"; btnReset.textContent = "Click again to reset";
+    clearTimeout(btnReset._t); btnReset._t = setTimeout(() => { delete btnReset.dataset.armed; btnReset.textContent = "↺ Reset"; }, 3000);
+    return;
+  }
+  clearTimeout(btnReset._t); delete btnReset.dataset.armed; btnReset.textContent = "↺ Reset";
+  log = structuredClone(startLog); currentHour = 0; viewHour = 0;
+  lastAnswer = null; selectedSeg = null; previewRoute = null; tab = "robot";
+  persist(); render(); toast("Reset to hour 0 — the starting scenario and its scheduled changes are back");
+};
+function nextHour() {
+  if (isPast()) return;
+  currentHour += 1; viewHour = currentHour; previewRoute = null; persist(); render();
+  const st = simulate(currentHour), c = scanContext(st);
+  if (c) toast(`Hour ${currentHour}: scan written to memory — ${c.changed.length} rating${c.changed.length === 1 ? "" : "s"} changed, path ${c.routeChanged ? "changed" : "unchanged"}`);
+}
+document.getElementById("tglTruth").onclick = () => { settings.showTruth = !settings.showTruth; persist(); render(); };
+document.getElementById("tglExplain").onclick = () => { settings.explain = !settings.explain; persist(); render(); };
+document.getElementById("tglLabels").onclick = () => { settings.labels = !settings.labels; persist(); render(); };
+
+function renderHeader() {
+  const building = mode === "build";
+  document.getElementById("modePill").textContent = building ? "Build · hour 0" : "Timeline";
+  document.getElementById("clockBox").style.visibility = building ? "hidden" : "visible";
+  document.getElementById("hourLabel").textContent = `Hour ${viewHour}`;
+  scrub.max = String(currentHour); scrub.value = String(viewHour);
+  document.getElementById("btnNow").disabled = !isPast();
+  document.getElementById("btnNextHdr").disabled = isPast();
+  document.getElementById("pastNote").textContent = isPast() ? `viewing past (now = hour ${currentHour})` : "";
+  document.getElementById("tglTruth").classList.toggle("on", settings.showTruth);
+  document.getElementById("tglExplain").classList.toggle("on", settings.explain);
+  document.getElementById("tglLabels").classList.toggle("on", settings.labels);
+  document.getElementById("legendTruth").style.display = building || settings.showTruth ? "" : "none";
+  document.getElementById("palLbl").textContent = building ? "Drag onto a segment (hour 0):" : isPast() ? "Viewing the past — go back to now to drag boxes" : `Drag onto a segment (logs at hour ${currentHour}):`;
+  document.querySelectorAll(".tool").forEach(t => t.classList.toggle("disabled", isPast()));
+  palSrc.innerHTML = sourceOptions(ui.palSrc, k => k !== "lidar_front"); palConf.innerHTML = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95].map(c => `<option value="${c}" ${c === ui.palConf ? "selected" : ""}>${pct(c)}</option>`).join("");
+  document.getElementById("agentMode").textContent = building ? "Start the timeline to ask the robot questions." : settings.useLLM && settings.groqKey ? `Live model: ${settings.groqModel} (Groq) with grounded tools` : "Built-in grounded agent — answers from beliefs, history and the route planner";
+  document.getElementById("btnAsk").disabled = building || asking;
+}
+
+function render() {
+  renderHeader();
+  const st = mode === "run" ? simulate(viewHour) : null;
+  if (st) st.ctx = scanContext(st);
+  renderMap(st);
+  renderTabs();
+  if (mode === "build") panel.innerHTML = tab === "segment" ? renderSegment(st) : tab === "settings" ? renderSettings() : renderBuild();
+  else panel.innerHTML = tab === "agent" ? renderAgent() : tab === "segment" ? renderSegment(st) : tab === "timeline" ? renderTimeline() : tab === "settings" ? renderSettings() : renderRobot(st);
+  wire(st);
+}
+
+// ───────────────────────── export YAML ─────────────────────────
+const yNum = x => Number((+x).toFixed(3));
+function exportYaml() {
+  const L = [`# Generated by dashboard/ghost_dashboard.html`, `id: ${WH.id}_custom`, `start: ${scenario.robot}`, `goal: ${WH.goal}`, ``, `junctions:`];
+  for (const [id, j] of Object.entries(WH.junctions)) L.push(`  ${id}: {label: "${j.label}", x: ${j.x}, y: ${j.y}}`);
+  L.push(``, `# Hour-0 beliefs (declarative layer). Segments with no belief are written as`, `# default_map / clear / 0.5 because the topology needs every segment.`, `segments:`);
+  for (const s of WH.segments) {
+    const id = segId(s.a, s.b), b = scenario.beliefs.find(x => x.seg === id);
+    L.push(b ? `  - {a: ${s.a}, b: ${s.b}, state: ${b.state}, source: ${b.source}, confidence: ${yNum(b.conf)}}` : `  - {a: ${s.a}, b: ${s.b}, state: clear, source: default_map, confidence: 0.5}  # no belief at hour 0`);
+  }
+  L.push(``, `# Hidden ground truth at hour 0 (NEW — not read by the current backend).`, `truth:`);
+  const tr = Object.entries(scenario.truth);
+  if (!tr.length) L.push(`  []`);
+  for (const [seg, t] of tr) L.push(`  - {segment: "${seg}", obstacle_at: ${yNum(t.pos)}${t.note ? `, note: "${t.note.replace(/"/g, "'")}"` : ""}}`);
+  L.push(``, `shelves:`);
+  for (const sh of WH.shelves) {
+    L.push(`  - id: ${sh.id}`, `    near: ${sh.near}`, `    dx: ${sh.dx}`, `    dy: ${sh.dy}`);
+    if (sh.target) L.push(`    target: true`);
+    if (sh.low) L.push(`    low: true`);
+    L.push(`    stock:`);
+    for (const k of sh.stock) L.push(`      - {source: ${k.source}, perspective: ${k.perspective === "self" ? "self" : `"${k.perspective}"`}, predicate: ${k.predicate}, value: ${k.value}${k.note ? `, note: "${k.note}"` : ""}}`);
+  }
+  document.getElementById("yamlWarehouse").value = L.join("\n") + "\n";
+  const E = [`# Timeline from dashboard/ghost_dashboard.html`, `# at_hour / world_* / lidar_scan / place_robot are NEW trigger and action types.`, `events:`];
+  const sorted = log.filter(e => e.kind !== "drive").map((e, i) => [e, i]).sort((x, y) => (x[0].hour - y[0].hour) || (x[1] - y[1])).map(x => x[0]);
+  if (!sorted.length) E.push(`  []`);
+  sorted.forEach((e, i) => {
+    E.push(`  - id: ${e.kind}_${i + 1}`, `    trigger: { at_hour: ${e.hour} }`);
+    if (e.kind === "report") E.push(`    fires:`, `      update_belief:`, `        subject: "${e.seg}"`, `        predicate: ${e.state === "blocked" ? "is_blocked" : "is_clear"}`, `        object: "${e.state === "blocked" ? "obstacle" : "true"}"`, `        source: ${e.source}`, `        perspective: ${perspectiveOf(e.source) === "self" ? "self" : `"${perspectiveOf(e.source)}"`}`, `        confidence: ${yNum(e.conf)}`, `        reason: "${(e.note || "logged change").replace(/"/g, "'")}"`);
+    else if (e.kind === "world_add") E.push(`    fires: { world_add: { segment: "${e.seg}", obstacle_at: ${yNum(e.pos ?? 0.5)} } }`);
+    else if (e.kind === "world_remove") E.push(`    fires: { world_remove: { segment: "${e.seg}" } }`);
+    else if (e.kind === "scan") E.push(`    fires: { lidar_scan: { commit_at_hour: ${e.hour + 1} } }`);
+    else if (e.kind === "place" || e.kind === "move") E.push(`    fires: { place_robot: { at: ${e.to} } }`);
+    E.push(`    summary: "${describeEvent(e).replace(/<[^>]+>/g, "").replace(/"/g, "'")}"`);
+  });
+  document.getElementById("yamlEvents").value = E.join("\n") + "\n";
+  document.getElementById("exportModal").style.display = "flex";
+}
+document.getElementById("btnExport").onclick = exportYaml;
+document.getElementById("btnCloseExport").onclick = () => { document.getElementById("exportModal").style.display = "none"; };
+document.querySelectorAll("[data-dl]").forEach(b => b.onclick = () => download(b.dataset.name, document.getElementById(b.dataset.dl).value, "text/yaml"));
+function download(name, text, type) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+
+// ───────────────────────── save / load ─────────────────────────
+const STORE_KEY = "iagent-ghost-dashboard-v2", KEY_STORE = "iagent-ghost-dashboard-groq";
+function snapshot() { const { groqKey, ...rest } = settings; return { version: 3, scenario, log, startLog, currentHour, viewHour, mode, sources, settings: rest, ui }; }
+function restore(s) {
+  if (!s || !s.scenario || ![1, 2, 3].includes(s.version)) throw new Error("not a ghost-dashboard session file");
+  scenario = s.scenario; log = (s.log || []).filter(e => e.kind !== "drive"); startLog = (s.startLog || log.filter(e => !["scan", "place", "move"].includes(e.kind))).filter(e => e.kind !== "drive"); currentHour = s.currentHour || 0; viewHour = Math.min(s.viewHour ?? currentHour, currentHour);
+  mode = s.mode === "run" ? "run" : "build"; sources = { ...structuredClone(DEFAULT_SOURCES), ...(s.sources || {}) };
+  settings = { ...settings, ...(s.settings || {}), groqKey: settings.groqKey }; ui = { ...ui, ...(s.ui || {}) };
+}
+function persist() { try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot())); localStorage.setItem(KEY_STORE, settings.groqKey || ""); } catch (_) { /* storage unavailable */ } }
+document.getElementById("btnSave").onclick = () => download(`ghost-session-hour${currentHour}.json`, JSON.stringify(snapshot(), null, 2), "application/json");
+document.getElementById("btnLoad").onclick = () => document.getElementById("fileLoad").click();
+document.getElementById("fileLoad").onchange = async ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  try { restore(JSON.parse(await f.text())); selectedSeg = null; previewRoute = null; lastAnswer = null; persist(); render(); toast("Session loaded"); }
+  catch (err) { toast("Could not load session: " + err.message); }
+  ev.target.value = "";
+};
+
+(function boot() {
+  let loaded = false;
+  try { settings.groqKey = localStorage.getItem(KEY_STORE) || ""; const raw = localStorage.getItem(STORE_KEY); if (raw) { restore(JSON.parse(raw)); loaded = true; } } catch (_) { loaded = false; }
+  if (!loaded) { const p = presetWarehouse7(); scenario = p.scenario; log = p.log; startLog = structuredClone(log); }
+  render();
+})();
+</script>
+</body>
+</html>

@@ -309,6 +309,7 @@ export default function App() {
 uvicorn iagent.api.server:app --reload --port 8000</pre>
           <p>Then reload this page. The dev server proxies <code>/api</code> to port 8000.</p>
           <button className="iconbtn" onClick={load}>Retry</button>
+          <p>Or open the <a href="/ghost.html">ghost-block timeline</a> — it runs entirely in the browser, no backend needed.</p>
         </div>
       </div>
     );
@@ -340,6 +341,9 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
         <button className="iconbtn ghost" onClick={toggleTheme} title="Toggle theme" aria-label="Toggle theme">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
         </button>
+        <a className="iconbtn" href="/ghost.html" style={{ textDecoration: "none" }} title="Hour-by-hour ghost-block simulator (no backend needed)">
+          Ghost timeline
+        </a>
         <button className="iconbtn" onClick={reset}>Reset</button>
         <button className="iconbtn" onClick={() => setDrawer(true)}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
