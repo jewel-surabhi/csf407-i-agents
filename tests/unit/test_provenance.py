@@ -170,6 +170,32 @@ def test_insert_source_is_idempotent(store):
     assert lidar.trust_prior == 0.9
 
 
+def test_list_sources_skips_malformed_rows_instead_of_raising(store):
+    """Reproduces a real incident: an on-disk warehouse.db predating the
+    `kind`/`trust_prior` NOT NULL constraints (or carrying a `kind` value
+    from before the Literal enum was tightened) had a row that fails
+    `Source` validation. That one bad row must not take down
+    list_sources() for every OTHER caller -- the warehouse startup
+    sequence and the Dashboard KPI row both depend on this list loading
+    successfully even when one row is corrupt.
+
+    The current schema.sql enforces NOT NULL on kind/trust_prior for any
+    FRESH database, so we can't literally insert NULLs here -- instead we
+    insert a `kind` value outside the Literal enum, which exercises the
+    exact same `except ValidationError: skip` path."""
+    good_before = len(store.list_sources())
+
+    store._conn.execute(
+        "INSERT INTO sources (source_id, kind, trust_prior, decay_rate_per_hour, description) "
+        "VALUES ('corrupt_source', 'not_a_real_kind', 0.5, 0.0, 'bad row')"
+    )
+    store._conn.commit()
+
+    sources = store.list_sources()
+    assert len(sources) == good_before  # corrupt row skipped, not counted
+    assert all(s.source_id != "corrupt_source" for s in sources)
+
+
 def test_insert_with_unknown_source_raises_knowledge_error(store):
     with pytest.raises(KnowledgeError, match="unknown source_id"):
         store.insert(_entry(source_id="UNREGISTERED"))

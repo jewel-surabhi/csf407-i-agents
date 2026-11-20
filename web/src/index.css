@@ -489,6 +489,34 @@ svg.floor text{font-family:var(--f-sign)}
   background:var(--warn-bg);border-radius:8px}
 .et-failure b{color:var(--warn)}
 
+/* ─────────────────────────────── Scenario B page ─────────────────────────── */
+.sb-setup{margin-bottom:32px}
+.sb-h{font-family:var(--f-sign);text-transform:uppercase;letter-spacing:.06em;
+  font-size:12px;color:var(--ink-3);font-weight:700;margin:20px 0 10px}
+.sb-h:first-child{margin-top:0}
+.sb-query{margin:0;padding:14px 18px;border-left:3px solid var(--accent);
+  background:var(--panel-2);border-radius:0 var(--radius) var(--radius) 0;
+  font-size:14px;font-style:italic;line-height:1.6;color:var(--ink)}
+.sb-query-small{font-size:12px;font-style:italic;color:var(--ink-2);line-height:1.5;margin-bottom:12px}
+
+.sb-targets{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.sb-target{padding:14px;border-radius:var(--radius);border:1px solid var(--line);
+  display:flex;flex-direction:column;gap:8px}
+.sb-target p{font-size:12.5px;line-height:1.5;color:var(--ink-2);margin:0}
+.sb-target p b{color:var(--ink)}
+.sb-target.psp-user-bg{background:var(--robot-soft);border-color:color-mix(in srgb,var(--robot) 35%,transparent)}
+.sb-target.psp-self-bg{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+.sb-target.psp-third-bg{background:color-mix(in srgb,var(--warn) 12%,transparent);
+  border-color:color-mix(in srgb,var(--warn) 35%,transparent)}
+.sb-results .sb-target p{color:var(--ink);font-style:normal}
+
+.sb-sect{padding:24px 0;border-top:1px solid var(--line-2)}
+.sb-sect-h{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.sb-sect-h .sb-h{margin:0}
+.sb-see-more{display:inline-block;margin-top:14px;font-size:12.5px;font-weight:600;
+  color:var(--accent);text-decoration:none}
+.sb-see-more:hover{text-decoration:underline}
+
 /* ─────────────────────────────── responsive ────────────────────────────── */
 @media (max-width:1100px){
   .stage{grid-template-columns:1fr 360px}
@@ -499,5 +527,6 @@ svg.floor text{font-family:var(--f-sign)}
   .insp{display:none}
   .status{display:none}
   .et-grid{grid-template-columns:1fr}
+  .sb-targets{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }

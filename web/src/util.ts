@@ -53,3 +53,33 @@ export function dirGlyph(from: { x: number; y: number }, to: { x: number; y: num
   if (to.y < from.y) return GLYPH.up;
   return GLYPH.down;
 }
+
+export interface ParsedPerspectives {
+  user: string;
+  self: string;
+  third: string;
+}
+
+/**
+ * Split a Scenario-B-style final answer into its three perspective segments.
+ * Handles both surface formats the live/recorded agents actually produce:
+ *   - bullet style: "- USER perspective: ...\n- SELF ...\n- THIRD-PARTY ..."
+ *   - paragraph style: "User perspective: ...\n\nSelf (camera) ...\n\nThird‑party ..."
+ * Returns null if it can't confidently find all three — callers should fall
+ * back to showing the raw text rather than guessing.
+ */
+export function parseThreePerspectives(answer: string): ParsedPerspectives | null {
+  const text = answer.replace(/\\n/g, "\n");
+  const byParagraph = text.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  const byLine = text.split("\n").map((s) => s.replace(/^[-*]\s*/, "").trim()).filter(Boolean);
+
+  for (const candidates of [byParagraph, byLine]) {
+    const user = candidates.find((c) => /^user/i.test(c));
+    const self = candidates.find((c) => /^self/i.test(c));
+    const third = candidates.find((c) => /^third/i.test(c));
+    if (user && self && third) {
+      return { user, self, third };
+    }
+  }
+  return null;
+}

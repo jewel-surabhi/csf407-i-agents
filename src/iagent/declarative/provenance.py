@@ -18,15 +18,19 @@ Owner: Person 1 (P1). See PROJECT_PLAN.md sections F.2 and G.1.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from iagent.declarative.models import KnowledgeError, ProvenanceEntry, Source
 
 _SCHEMA_PATH = Path(__file__).parent / "schema.sql"
+_LOG = logging.getLogger(__name__)
 
 
 class ProvenanceStore:
@@ -243,18 +247,35 @@ class ProvenanceStore:
             )
 
     def list_sources(self) -> list[Source]:
-        return [
-            Source(
-                source_id=row["source_id"],
-                kind=row["kind"],
-                trust_prior=row["trust_prior"],
-                decay_rate_per_hour=self._decay_or_default(row),
-                description=row["description"],
-            )
-            for row in self._conn.execute(
-                "SELECT source_id, kind, trust_prior, decay_rate_per_hour, description FROM sources"
-            ).fetchall()
-        ]
+        """Every registered source. A row that fails validation (e.g. a
+        partially-written insert left `kind`/`trust_prior` NULL from a
+        crashed process) is logged and skipped rather than taking down every
+        caller of this method -- callers like the warehouse's startup
+        sequence and the Dashboard KPI row all depend on this list, and one
+        bad row should not make the whole app unreachable."""
+        sources: list[Source] = []
+        for row in self._conn.execute(
+            "SELECT source_id, kind, trust_prior, decay_rate_per_hour, description FROM sources"
+        ).fetchall():
+            try:
+                sources.append(
+                    Source(
+                        source_id=row["source_id"],
+                        kind=row["kind"],
+                        trust_prior=row["trust_prior"],
+                        decay_rate_per_hour=self._decay_or_default(row),
+                        description=row["description"],
+                    )
+                )
+            except ValidationError:
+                # `source_id` is always present -- it's a selected column and
+                # the table's primary key, so this lookup can't itself fail.
+                _LOG.warning(
+                    "skipping malformed sources row %r — likely a partial write "
+                    "from an earlier crashed process or a pre-migration schema",
+                    row["source_id"],
+                )
+        return sources
 
     @staticmethod
     def _decay_or_default(row) -> float:
