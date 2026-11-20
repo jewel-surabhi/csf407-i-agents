@@ -74,6 +74,12 @@ export default function DashboardPage() {
             desc="The 10 grounded-reasoning tests that back every claim this project makes, with full traces."
           />
           <NavCard
+            to="/scenario-b"
+            eyebrow="From the proposal"
+            title="Scenario B"
+            desc="Tracking perspective: user expects red, the camera sees brown, history says blue — all three, never merged."
+          />
+          <NavCard
             to="/trust"
             eyebrow="Reference"
             title="Trust & Sources"
