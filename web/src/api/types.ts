@@ -160,3 +160,25 @@ export interface AgentResult {
   trace: { query: string; steps: TraceStep[]; final_answer: string };
   tools_called: string[];
 }
+
+// /api/epistemic/tests — the 10 committed epistemic test trace logs.
+export interface EpistemicStepSummary {
+  idx: number;
+  tool_name?: string | null;
+  ok?: boolean | null;
+}
+
+export interface EpistemicTraceSummary {
+  test_id: string;
+  number: number;
+  slug: string;
+  title: string;
+  mode: "recorded" | "live";
+  verdict: "pass" | "fail" | "unknown";
+  scenario?: string | null;
+  query: string;
+  final_answer: string;
+  step_count: number;
+  steps: EpistemicStepSummary[];
+  failure_mode_tested?: string | null;
+}

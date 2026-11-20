@@ -35,7 +35,13 @@ export default function Layout() {
 
         <nav className="topnav">
           <NavLink to="/" end className={({ isActive }) => "topnav-l" + (isActive ? " active" : "")}>
+            Dashboard
+          </NavLink>
+          <NavLink to="/operations" className={({ isActive }) => "topnav-l" + (isActive ? " active" : "")}>
             Operations
+          </NavLink>
+          <NavLink to="/epistemic" className={({ isActive }) => "topnav-l" + (isActive ? " active" : "")}>
+            Epistemic Tests
           </NavLink>
           <NavLink to="/trust" className={({ isActive }) => "topnav-l" + (isActive ? " active" : "")}>
             Trust

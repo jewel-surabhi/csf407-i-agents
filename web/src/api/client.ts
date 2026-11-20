@@ -1,6 +1,7 @@
 import type {
   AgentResult,
   Belief,
+  EpistemicTraceSummary,
   InventoryView,
   ProvenanceEntry,
   ShelfContents,
@@ -76,6 +77,10 @@ export const api = {
       headers: jsonHeaders,
       body: JSON.stringify({ lesson, topic, confidence }),
     }).then(asJson<Belief>),
+
+  // The 10 committed epistemic test trace logs (recorded + live variants).
+  epistemicTests: () =>
+    fetch("/api/epistemic/tests").then(asJson<EpistemicTraceSummary[]>),
 
   /**
    * Streaming version of `query` — emits steps one by one as the agent runs
