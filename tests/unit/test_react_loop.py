@@ -253,6 +253,91 @@ def test_free_text_thought_is_logged_and_loop_nudges(knowledge, sensors):
     assert result.answer == "ok"
 
 
+def test_implicit_finalize_from_json_shaped_free_text(knowledge, sensors):
+    """Mid-size models sometimes type finalize_answer's arguments as plain
+    JSON text instead of calling the tool. The loop must detect
+    {"answer": "...", ...} free text and treat it as an implicit
+    finalize_answer -- closing the episode in that same turn rather than
+    nudging for another (which is what let the model drift into
+    over-verification and a hallucinated retraction in production)."""
+    script = [
+        {"content": '{"answer": "The facility is open from 06:00 until 22:00.", '
+                     '"cited_beliefs": ["1369", "1370"], "cited_sensors": []}'},
+    ]
+    result = _agent(knowledge, sensors, script).run("What are the facility's hours?")
+
+    assert result.answer == "The facility is open from 06:00 until 22:00."
+    assert len(result.trace.steps) == 1
+    step = result.trace.steps[0]
+    assert step.tool_call is not None
+    assert step.tool_call.name == "finalize_answer"
+    assert step.final_answer == "The facility is open from 06:00 until 22:00."
+
+
+def test_prose_thought_is_not_misread_as_implicit_finalize(knowledge, sensors):
+    """A normal prose thought that happens to contain the word 'answer' must
+    NOT be treated as an implicit finalize -- only a clean JSON-object parse
+    with a string "answer" key qualifies."""
+    script = [
+        {"content": "I need to find the answer by checking the belief graph first."},
+        {"tool": "finalize_answer", "arguments": {"answer": "ok"}},
+    ]
+    result = _agent(knowledge, sensors, script).run("x")
+
+    assert len(result.trace.steps) == 2
+    assert result.trace.steps[0].tool_call is None
+    assert result.answer == "ok"
+
+
+def test_malformed_implicit_finalize_falls_back_to_nudge(knowledge, sensors):
+    """JSON text with no usable "answer" key (or an empty one) is not an
+    implicit finalize -- it falls through to the ordinary nudge-and-continue
+    path instead of silently closing the episode with nothing."""
+    script = [
+        {"content": '{"status": "still thinking"}'},
+        {"tool": "finalize_answer", "arguments": {"answer": "done"}},
+    ]
+    result = _agent(knowledge, sensors, script).run("x")
+
+    assert len(result.trace.steps) == 2
+    assert result.trace.steps[0].tool_call is None
+    assert result.answer == "done"
+
+
+def test_max_steps_falls_back_to_first_grounded_prose_answer(knowledge, sensors):
+    """Reproduces the production failure: the model answers correctly in
+    prose after real tool calls, then wastes its remaining budget
+    over-verifying and eventually contradicts its own answer. Rather than
+    raising MaxStepsExceeded (discarding a correct answer) or trusting the
+    LAST (hallucinated-retraction) thought, the loop must finalize with the
+    FIRST grounded prose answer."""
+    script = [
+        {"tool": "get_belief", "arguments": {"subject": "facility", "predicate": "opens_at"}},
+        {"tool": "get_belief", "arguments": {"subject": "facility", "predicate": "closes_at"}},
+        {"content": "The facility is open from 06:00 until 22:00."},
+        {"content": "I've already provided the answer and concluded the episode."},
+        {"tool": "sense_clock", "arguments": {}},
+        {"content": "I don't have any additional evidence about the facility's hours."},
+    ]
+    result = _agent(knowledge, sensors, script).run("What are the hours?", max_steps=6)
+
+    assert result.answer == "The facility is open from 06:00 until 22:00."
+    final_step = result.trace.steps[-1]
+    assert final_step.tool_call is not None
+    assert final_step.tool_call.name == "finalize_answer"
+
+
+def test_max_steps_without_any_prose_still_raises(knowledge, sensors):
+    """No free-text thought at all in the episode -- there is nothing to
+    fall back to, so MaxStepsExceeded must still raise."""
+    script = [
+        {"tool": "list_sources", "arguments": {}},
+        {"tool": "list_sources", "arguments": {}},
+    ]
+    with pytest.raises(MaxStepsExceeded):
+        _agent(knowledge, sensors, script).run("hi", max_steps=2)
+
+
 def test_dispatch_error_is_captured_but_loop_continues(knowledge, sensors):
     """A tool-level error (e.g. required argument missing) is surfaced in
     the Observation with ok=False, and the loop keeps going."""

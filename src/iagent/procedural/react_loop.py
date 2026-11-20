@@ -145,6 +145,19 @@ def run_react(
                 on_step(step)
         return step
 
+    # Last-resort fallback for MaxStepsExceeded. Captures the FIRST
+    # substantive free-text thought that follows at least one real tool
+    # call -- i.e. the model's first attempt at stating an answer it had
+    # actual evidence for. Deliberately first-write-wins: a model that
+    # later over-verifies and contradicts itself (see verification report
+    # §6 -- the small/mid Groq models sometimes "forget" finalize_answer,
+    # probe further, then hallucinate a retraction of an answer they
+    # already had) should not get to overwrite its own correct answer.
+    # Only ever consulted if the episode would otherwise raise
+    # MaxStepsExceeded with zero answer -- a model that calls
+    # finalize_answer properly never touches this path.
+    grounded_prose_answer: str | None = None
+
     for step_idx in range(1, max_steps + 1):
         messages = truncate_context(
             messages,
@@ -161,9 +174,53 @@ def run_react(
         response: AssistantResponse = agent.llm.chat_with_tools(messages, specs)
 
         if not response.tool_calls:
-            # Free-text response with no tool call -- log it, nudge the LLM.
+            # Free-text response with no tool call. Small/mid-size models
+            # occasionally "forget" to call finalize_answer and instead type
+            # its JSON arguments out as plain text, e.g.
+            #   {"answer": "...", "cited_beliefs": [...]}
+            # Treat that shape as an IMPLICIT finalize_answer rather than
+            # nudging for another turn -- burning extra turns here is exactly
+            # what causes the model to then over-verify and occasionally
+            # contradict an answer it already had (see verification report
+            # §6: hallucinated retraction after a correct free-text answer).
             thought_text = (response.content or "").strip()
+            implicit_answer = _parse_implicit_finalize(thought_text)
+            if implicit_answer is not None:
+                result = dispatch(FINALIZE_TOOL, implicit_answer, apis, enable_actuators=enable_actuators)
+                _emit(
+                    Step(
+                        idx=step_idx,
+                        thought=thought_text,
+                        tool_call=ToolCall(name=FINALIZE_TOOL, arguments=implicit_answer),
+                        observation=Observation(
+                            tool=FINALIZE_TOOL,
+                            ok=bool(result.get("ok")),
+                            content=result.get("data") if result.get("ok") else result.get("error"),
+                        ),
+                        final_answer=implicit_answer.get("answer") if result.get("ok") else None,
+                    )
+                )
+                if result.get("ok"):
+                    trace.final_answer = _extract_final_answer(result)
+                    trace.ended_at = _now()
+                    if runs_dir is not None:
+                        trace.dump(runs_dir)
+                    return trace
+                # Malformed implicit answer -- fall through to the normal nudge.
+                messages.append({"role": "assistant", "content": thought_text})
+                messages.append({"role": "user", "content": _NUDGE})
+                continue
+
             _emit(Step(idx=step_idx, thought=thought_text or "(empty)"))
+
+            if (
+                grounded_prose_answer is None
+                and thought_text
+                and len(thought_text) > 15
+                and any(s.tool_call is not None for s in trace.steps)
+            ):
+                grounded_prose_answer = thought_text
+
             if thought_text:
                 messages.append({"role": "assistant", "content": thought_text})
             messages.append({"role": "user", "content": _NUDGE})
@@ -219,7 +276,34 @@ def run_react(
                 trace.dump(runs_dir)
             return trace
 
-    # Loop budget exhausted without a final answer.
+    # Loop budget exhausted without finalize_answer. Before giving up, fall
+    # back to the first grounded prose answer captured above, if any --
+    # strictly better than discarding a correct answer the model already
+    # gave just because it then wasted its remaining budget on
+    # over-verification or self-contradiction.
+    if grounded_prose_answer is not None:
+        synthetic_args = {"answer": grounded_prose_answer}
+        result = dispatch(FINALIZE_TOOL, synthetic_args, apis, enable_actuators=enable_actuators)
+        _emit(
+            Step(
+                idx=max_steps,
+                thought=grounded_prose_answer,
+                tool_call=ToolCall(name=FINALIZE_TOOL, arguments=synthetic_args),
+                observation=Observation(
+                    tool=FINALIZE_TOOL,
+                    ok=bool(result.get("ok")),
+                    content=result.get("data") if result.get("ok") else result.get("error"),
+                ),
+                final_answer=grounded_prose_answer if result.get("ok") else None,
+            )
+        )
+        if result.get("ok"):
+            trace.final_answer = _extract_final_answer(result)
+            trace.ended_at = _now()
+            if runs_dir is not None:
+                trace.dump(runs_dir)
+            return trace
+
     trace.ended_at = _now()
     dumped = dump_trace(trace, runs_dir) if runs_dir is not None else None
     raise MaxStepsExceeded(trace, dump_path=dumped)
@@ -375,3 +459,33 @@ def _extract_final_answer(result: dict[str, Any]) -> str:
         if isinstance(answer, str):
             return answer
     return ""
+
+
+def _parse_implicit_finalize(thought_text: str) -> dict[str, Any] | None:
+    """Detect a free-text turn that is really `finalize_answer`'s arguments,
+    typed out as JSON instead of called as a tool.
+
+    Observed on mid-size Groq models (gpt-oss-120b): instead of emitting a
+    tool_call, the model sometimes writes
+        {"answer": "...", "cited_beliefs": [...], "cited_sensors": [...]}
+    as its message content. Returns the parsed dict (ready to hand to
+    `dispatch(FINALIZE_TOOL, ...)`) if `thought_text` is a JSON object with a
+    non-empty string "answer" key, else None.
+
+    Deliberately strict: only fires on a clean JSON object parse, so normal
+    prose thoughts (including ones that happen to mention the word "answer")
+    are never misread as a finalize call.
+    """
+    text = thought_text.strip()
+    if not (text.startswith("{") and text.endswith("}")):
+        return None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    answer = parsed.get("answer")
+    if not isinstance(answer, str) or not answer.strip():
+        return None
+    return parsed

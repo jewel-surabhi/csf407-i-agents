@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # GROQ_API_KEY (and any IAGENT_* overrides) are available to the agent singleton.
 load_dotenv()
 
+from iagent.api.epistemic_routes import router as epistemic_router  # noqa: E402
 from iagent.api.routes import router  # noqa: E402  (import after env load, intentional)
 from iagent.api.warehouse_routes import router as warehouse_router  # noqa: E402
 
@@ -44,3 +45,4 @@ app.add_middleware(
 
 app.include_router(router)
 app.include_router(warehouse_router)
+app.include_router(epistemic_router)
