@@ -13,6 +13,10 @@ export default function Layout() {
           <pre>$env:PYTHONPATH='src'; python -m uvicorn iagent.api.server:app --reload --port 8000 --app-dir src</pre>
           <p>Then reload this page. The dev server proxies <code>/api</code> to port 8000.</p>
           <button className="btn-primary" onClick={load}>Retry</button>
+          <p style={{ marginTop: 14 }}>
+            Or open the <a href="/ghost.html">ghost-block timeline</a> — it runs
+            entirely in the browser, no backend needed.
+          </p>
         </div>
       </div>
     );
@@ -43,6 +47,9 @@ export default function Layout() {
           <NavLink to="/epistemic" className={({ isActive }) => "topnav-l" + (isActive ? " active" : "")}>
             Epistemic Tests
           </NavLink>
+          <NavLink to="/scenario-b" className={({ isActive }) => "topnav-l" + (isActive ? " active" : "")}>
+            Scenario B
+          </NavLink>
           <NavLink to="/trust" className={({ isActive }) => "topnav-l" + (isActive ? " active" : "")}>
             Trust
           </NavLink>
@@ -63,6 +70,16 @@ export default function Layout() {
         </div>
 
         <div className="actions">
+          {/* Plain <a>, not react-router's <Link> — this is a standalone static
+              page outside the SPA's route table, so it needs a real browser
+              navigation rather than client-side routing. */}
+          <a
+            className="icnbtn"
+            href="/ghost.html"
+            title="Hour-by-hour ghost-block simulator — runs entirely in the browser, no backend needed"
+          >
+            Ghost timeline
+          </a>
           <button className="icnbtn ghost" onClick={toggleTheme} aria-label="Toggle theme" title="Toggle theme">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="4" />

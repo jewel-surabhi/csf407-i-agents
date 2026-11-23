@@ -74,6 +74,12 @@ export default function DashboardPage() {
             desc="The 10 grounded-reasoning tests that back every claim this project makes, with full traces."
           />
           <NavCard
+            to="/scenario-b"
+            eyebrow="From the proposal"
+            title="Scenario B"
+            desc="Tracking perspective: user expects red, the camera sees brown, history says blue — all three, never merged."
+          />
+          <NavCard
             to="/trust"
             eyebrow="Reference"
             title="Trust & Sources"
@@ -90,6 +96,13 @@ export default function DashboardPage() {
             eyebrow="Explainer"
             title="Architecture"
             desc="The three-layer diagram and the reasoning behind grounding, decay, reflection, and events."
+          />
+          <NavCard
+            to="/ghost.html"
+            external
+            eyebrow="No backend needed"
+            title="Ghost Timeline"
+            desc="Drag-and-drop belief simulator: build a scenario, run it hour by hour, watch confidence decay and routes replan."
           />
         </section>
       </div>
@@ -111,14 +124,22 @@ function KpiCard({
 }
 
 function NavCard({
-  to, eyebrow, title, desc,
-}: { to: string; eyebrow: string; title: string; desc: string }) {
-  return (
-    <Link to={to} className="nav-card">
+  to, eyebrow, title, desc, external,
+}: { to: string; eyebrow: string; title: string; desc: string; external?: boolean }) {
+  const content = (
+    <>
       <span className="nav-card-eyebrow">{eyebrow}</span>
       <h3>{title}</h3>
       <p>{desc}</p>
       <span className="nav-card-go">Open →</span>
-    </Link>
+    </>
   );
+  // `external` pages (static files outside the SPA's route table, like
+  // ghost.html) need a real browser navigation -- react-router's <Link>
+  // would just change the URL via history.pushState and render nothing,
+  // since no <Route> matches that path.
+  if (external) {
+    return <a href={to} className="nav-card">{content}</a>;
+  }
+  return <Link to={to} className="nav-card">{content}</Link>;
 }
