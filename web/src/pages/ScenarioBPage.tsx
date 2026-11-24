@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useWarehouse } from "../context/WarehouseContext";
 import type { EpistemicTraceSummary, TraceStep } from "../api/types";
 import { parseThreePerspectives } from "../util";
+import PerspectiveStudio from "../components/PerspectiveStudio";
 
 const LIVE_DEMO_QUERY =
   "For WIDGET-42, report three perspectives separately: what the user wants, " +
@@ -56,6 +57,8 @@ export default function ScenarioBPage() {
             another.
           </p>
         </header>
+
+        <PerspectiveStudio />
 
         <section className="sb-setup">
           <h3 className="sb-h">The test query</h3>
