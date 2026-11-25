@@ -344,6 +344,9 @@ uvicorn iagent.api.server:app --reload --port 8000</pre>
         <a className="iconbtn" href="/ghost.html" style={{ textDecoration: "none" }} title="Hour-by-hour ghost-block simulator (no backend needed)">
           Ghost timeline
         </a>
+        <a className="iconbtn" href="/grid.html" style={{ textDecoration: "none" }} title="Scenario A: setup, LiDAR scans and the grounded ReAct loop">
+          Scenario A grid
+        </a>
         <button className="iconbtn" onClick={reset}>Reset</button>
         <button className="iconbtn" onClick={() => setDrawer(true)}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
