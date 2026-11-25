@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 
 from iagent.grid.agent import run_grid_question
 from iagent.grid.session import GridSession
-from iagent.grid.world import COLS, ROWS, SPACING_CM, GridWorld, all_nodes, all_segments
+from iagent.grid.world import BOX_COLORS, COLS, ROWS, SPACING_CM, GridWorld, all_nodes, all_segments
 
 router = APIRouter(prefix="/api/grid", tags=["grid"])
 page_router = APIRouter(tags=["grid"])
@@ -58,7 +58,8 @@ def get_grid_llm() -> Any:
     from iagent.procedural.llm_client import LLMClient, LLMClientError
 
     try:
-        return LLMClient()
+        # The Total map (31 paths) is submitted in one tool call; leave room for it.
+        return LLMClient(max_tokens=8192, timeout_s=90)
     except LLMClientError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -66,7 +67,7 @@ def get_grid_llm() -> Any:
 class SetupBody(BaseModel):
     robot: str
     target: str
-    boxes: list[str] = Field(default_factory=list)
+    boxes: dict[str, str] = Field(default_factory=dict)  # path id -> colour (red|blue|yellow)
 
 
 class AskBody(BaseModel):
@@ -90,11 +91,8 @@ def _state(session: GridSession) -> dict[str, Any]:
         "last": session.history[-1] if session.history else None,
         "questions": len(session.history),
         "timeline": session.timeline(),
-        "sources": {
-            k: {"trust_prior": v.trust_prior, "decay_per_hour": v.decay_rate_per_hour}
-            for k, v in session._sources.items()
-            if k in ("operator_setup", "lidar_declared")
-        },
+        "sources": session.sources_view(),
+        "colors": list(BOX_COLORS),
     }
 
 
@@ -117,7 +115,7 @@ def declarations(session: Session, hour: float) -> dict[str, Any]:
 @router.post("/setup")
 def setup(body: SetupBody, session: Session) -> dict[str, Any]:
     try:
-        world = GridWorld(robot=body.robot, target=body.target, boxes=set(body.boxes))
+        world = GridWorld(robot=body.robot, target=body.target, boxes=dict(body.boxes))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     declared_now = session.complete_setup(world)

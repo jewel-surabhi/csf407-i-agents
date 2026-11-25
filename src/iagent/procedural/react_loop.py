@@ -30,6 +30,7 @@ Owner: Person 3 (Phase 4). See PROJECT_PLAN.md sections H.2 and H.5.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -105,6 +106,9 @@ def run_react(
     test_id: str | None = None,
     token_budget: int = DEFAULT_TOKEN_BUDGET,
     max_context_messages: int = DEFAULT_CONTEXT_MESSAGES,
+    system_prompt: str | None = None,
+    tool_specs: list[dict[str, Any]] | None = None,
+    dispatch_fn: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
 ) -> Trace:
     """Drive one ReAct episode. Returns the completed `Trace`.
 
@@ -115,15 +119,26 @@ def run_react(
     When `runs_dir` is given the trace is written there before returning —
     and also before raising `MaxStepsExceeded`, so a capped-out episode still
     leaves a log on disk.
+
+    A task can run its own prompt and tools through the same loop by passing
+    `system_prompt`, `tool_specs` and `dispatch_fn(name, arguments)`; the
+    dispatcher must answer `finalize_answer` with `{"ok": True, "data":
+    {"answer": ...}}`. Left as None, the agent's standard prompt and tools are
+    used, so existing callers are unaffected.
     """
     apis: dict[str, Any] = {
         "knowledge": agent.knowledge,
         "sensors": agent.sensors,
     }
-    specs = build_tool_specs(enable_actuators=enable_actuators)
+    specs = tool_specs if tool_specs is not None else build_tool_specs(enable_actuators=enable_actuators)
+
+    def _dispatch(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        if dispatch_fn is not None:
+            return dispatch_fn(name, arguments)
+        return dispatch(name, arguments, apis, enable_actuators=enable_actuators)
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt or SYSTEM_PROMPT},
         {"role": "user", "content": format_query(query, scenario)},
     ]
     trace = Trace(
@@ -167,7 +182,7 @@ def run_react(
         finals = [tc for tc in response.tool_calls if tc.name == FINALIZE_TOOL]
 
         for tc in pending:
-            result = dispatch(tc.name, tc.arguments, apis, enable_actuators=enable_actuators)
+            result = _dispatch(tc.name, tc.arguments)
             trace.append(
                 _build_step(
                     idx=step_idx,
@@ -185,7 +200,7 @@ def run_react(
             # but each still gets a tool result, or the message log would be
             # invalid on the next request.
             result = (
-                dispatch(tc.name, tc.arguments, apis, enable_actuators=enable_actuators)
+                _dispatch(tc.name, tc.arguments)
                 if position == 0
                 else dict(_DUPLICATE_FINALIZE)
             )

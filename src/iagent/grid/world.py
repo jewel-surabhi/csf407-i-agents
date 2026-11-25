@@ -10,29 +10,30 @@ The robot stands on a node, the target is a node, and a box always sits at
 the MIDPOINT of a segment. Neighbouring nodes are ``SPACING_CM`` apart, so a
 box on the first segment in front of the robot is 50 cm away.
 
-This module is pure (no I/O, no LLM). It is the "real world" the LiDAR
-reads during the usage phase.
+This module is pure (no I/O, no LLM). It describes the "real world"; the
+sensors never read it directly. ``layer_readers.sensor_map`` converts it into
+the sensorimotor layer's ``WorldState`` and reads it through
+``SensorimotorAPI``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from iagent.sensorimotor.sensors import lidar_confidence
-
 __all__ = [
     "COLS",
     "ROWS",
     "SPACING_CM",
     "DIRECTIONS",
+    "BOX_COLORS",
     "GridWorld",
-    "LidarReading",
     "node_id",
     "node_xy",
     "all_nodes",
     "all_segments",
     "segment_id",
-    "scan",
+    "segment_ids",
+    "ray",
 ]
 
 COLS = 5
@@ -94,14 +95,32 @@ def all_segments() -> list[dict[str, str]]:
 
 _SEGMENT_IDS = frozenset(s["id"] for s in all_segments())
 
+# A box is a label for the robot to identify; colour does not change routing.
+BOX_COLORS = ("red", "blue", "yellow")
+
+
+def segment_ids() -> frozenset[str]:
+    return _SEGMENT_IDS
+
+
+def ray(node: str, direction: str) -> list[str]:
+    """Segments from ``node`` to the edge of the grid in a compass direction, nearest first."""
+    dc, dr = DIRECTIONS[direction]
+    c, r = node_xy(node)
+    out: list[str] = []
+    while 0 <= c + dc < COLS and 0 <= r + dr < ROWS:
+        out.append(segment_id(node_id(c, r), node_id(c + dc, r + dr)))
+        c, r = c + dc, r + dr
+    return out
+
 
 @dataclass
 class GridWorld:
-    """Ground truth: where the robot is, where it must go, which segments hold a box."""
+    """Ground truth: robot node, target node, and a coloured box on some segments."""
 
     robot: str = "A1"
     target: str = "E4"
-    boxes: set[str] = field(default_factory=set)
+    boxes: dict[str, str] = field(default_factory=dict)  # segment id -> colour
 
     def __post_init__(self) -> None:
         self.validate()
@@ -114,52 +133,9 @@ class GridWorld:
         unknown = sorted(set(self.boxes) - _SEGMENT_IDS)
         if unknown:
             raise ValueError(f"unknown segment(s): {', '.join(unknown)}")
+        bad = sorted({c for c in self.boxes.values() if c not in BOX_COLORS})
+        if bad:
+            raise ValueError(f"unknown box colour(s): {', '.join(bad)}; use {', '.join(BOX_COLORS)}")
 
     def to_dict(self) -> dict:
-        return {"robot": self.robot, "target": self.target, "boxes": sorted(self.boxes)}
-
-
-@dataclass(frozen=True)
-class LidarReading:
-    """What one LiDAR beam says about one segment."""
-
-    segment: str
-    blocked: bool
-    confidence: float
-    distance_cm: int
-    direction: str
-
-    def to_dict(self) -> dict:
-        return {
-            "segment": self.segment,
-            "blocked": self.blocked,
-            "confidence": self.confidence,
-            "distance_cm": self.distance_cm,
-            "direction": self.direction,
-        }
-
-
-def scan(world: GridWorld) -> dict[str, LidarReading]:
-    """Sweep the robot's row and column in all four directions.
-
-    Each beam runs until the grid ends or it hits a box. Segments the beam
-    passes through completely are read as clear, with the confidence for the
-    distance to the segment's far end. The segment holding the box is read
-    as blocked, with the confidence for the distance to the box (the
-    midpoint). Segments behind a box are not seen and get no reading.
-    """
-    readings: dict[str, LidarReading] = {}
-    col, row = node_xy(world.robot)
-    for direction, (dc, dr) in DIRECTIONS.items():
-        c, r, travelled = col, row, 0
-        while 0 <= c + dc < COLS and 0 <= r + dr < ROWS:
-            here, there = node_id(c, r), node_id(c + dc, r + dr)
-            seg = segment_id(here, there)
-            if seg in world.boxes:
-                distance = travelled + SPACING_CM // 2
-                readings[seg] = LidarReading(seg, True, lidar_confidence(distance), distance, direction)
-                break
-            travelled += SPACING_CM
-            readings[seg] = LidarReading(seg, False, lidar_confidence(travelled), travelled, direction)
-            c, r = c + dc, r + dr
-    return readings
+        return {"robot": self.robot, "target": self.target, "boxes": dict(sorted(self.boxes.items()))}

@@ -60,15 +60,17 @@ def test_lidar_clear_when_no_obstacle_in_direction():
     assert reading.value >= 30  # anything past the block threshold reads clear
 
 
-def test_lidar_status_flips_when_obstacle_is_beyond_threshold():
+def test_lidar_reports_far_obstacle_as_blocked_with_lower_confidence():
     world = WorldState(
         robot={"position": "room_101", "facing": "forward"},
         obstacles=[{"id": "far_crate", "in_front_of": "robot", "distance_cm": 200}],
     )
     reading = read_lidar(world, "front", observed_at=MockEnvironment().now)
 
-    assert reading.status == "clear"
+    # No 30 cm cut-off: anything detected in range is blocked; distance lowers confidence.
+    assert reading.status == "blocked"
     assert reading.value == 200
+    assert reading.confidence == lidar_confidence(200) < lidar_confidence(12)
 
 
 def test_lidar_picks_nearest_obstacle_when_multiple_in_direction():
@@ -156,3 +158,49 @@ def test_lidar_no_obstacle_reports_minimum_confidence():
     env = MockEnvironment.from_scenario(SCENARIO_A)
     reading = SensorimotorAPI(env).sense_lidar("left")
     assert reading.confidence == LIDAR_MIN_CONFIDENCE
+
+
+
+# --- sweeps --------------------------------------------------------------
+
+
+def _grid_world(**ranges):
+    return WorldState(
+        obstacles=[
+            {"id": "box_e", "in_right_of": "robot", "distance_cm": 250, "color": "red"},
+            {"id": "box_s", "in_back_of": "robot", "distance_cm": 50, "color": "blue"},
+        ],
+        extras={"cell_cm": 100, "beam_range_cm": ranges},
+    )
+
+
+def test_lidar_sweep_reads_every_cell_until_the_first_obstacle():
+    from iagent.sensorimotor.sensors import read_lidar_sweep
+
+    w = _grid_world(front=0, right=400, back=300, left=0)
+    beams = read_lidar_sweep(w, observed_at=MockEnvironment().now).raw["beams"]
+    right = beams["right"]
+    assert [c["status"] for c in right] == ["clear", "clear", "blocked"]
+    assert [c["confidence"] for c in right] == [lidar_confidence(100), lidar_confidence(200), lidar_confidence(250)]
+    assert beams["back"] == [beams["back"][0]] and beams["back"][0]["status"] == "blocked"
+    assert beams["front"] == [] and beams["left"] == []
+
+
+def test_lidar_sweep_clear_beam_runs_to_the_edge():
+    from iagent.sensorimotor.sensors import read_lidar_sweep
+
+    w = WorldState(extras={"cell_cm": 100, "beam_range_cm": {"front": 300}})
+    front = read_lidar_sweep(w, observed_at=MockEnvironment().now).raw["beams"]["front"]
+    assert [c["to_cm"] for c in front] == [100, 200, 300]
+    assert all(c["status"] == "clear" for c in front)
+
+
+def test_camera_sweep_sees_colour_of_first_box_with_distance_confidence():
+    from iagent.sensorimotor.sensors import camera_confidence, read_camera_sweep
+
+    w = _grid_world(front=0, right=400, back=300, left=0)
+    det = {d["direction"]: d for d in read_camera_sweep(w, observed_at=MockEnvironment().now).detections}
+    assert det["right"]["color"] == "red" and det["back"]["color"] == "blue"
+    assert det["back"]["confidence"] == camera_confidence(50) == 0.98
+    assert det["right"]["confidence"] == camera_confidence(250) < 0.98
+    assert camera_confidence(400) == 0.70

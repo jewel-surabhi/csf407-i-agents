@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="color-scheme" content="light dark" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Scenario A · I, Agent</title>
+<title>I, Agent · Grid</title>
 <style>
   :root {
     --bg: #efece4; --card: #ffffff; --card-2: #f6f4ee; --ink: #1c2024; --muted: #5b636c; --faint: #8b929b;
@@ -12,6 +12,7 @@
     --accent: #0d7d74; --accent-ink: #ffffff; --accent-soft: #d9efec;
     --clear: #2c9b6a; --clear-soft: #e3f3ea; --blocked: #cf4330; --blocked-soft: #f7e2dd;
     --unknown: #9aa1a9; --box: #1c2024; --robot: #2b6fb3; --target: #7f56d9;
+    --box-red: #d6453d; --box-blue: #2f6fd6; --box-yellow: #e2b007; --path-clear: #a7adb5; --path-blocked: #3c434c;
     --shadow: 0 1px 2px rgba(28,32,36,.08), 0 8px 24px rgba(28,32,36,.08);
     --r: 12px;
   }
@@ -21,6 +22,7 @@
     --accent: #2dd4bf; --accent-ink: #06201d; --accent-soft: #12302d;
     --clear: #36c088; --clear-soft: #13302a; --blocked: #f0634c; --blocked-soft: #3a1f1c;
     --unknown: #6c7682; --box: #eef1f5; --robot: #5a9ae6; --target: #a78bfa;
+    --box-red: #f0634c; --box-blue: #5a8ff0; --box-yellow: #f2c53d; --path-clear: #5d6773; --path-blocked: #c7ced6;
     color-scheme: dark;
   } }
   * { box-sizing: border-box; }
@@ -105,12 +107,24 @@
   .pastnote { display: flex; align-items: center; gap: 10px; }
   .pastnote p { margin: 0; flex: 1; font-size: 13px; color: var(--muted); }
   .pastnote button { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); padding: 7px 12px; border-radius: 8px; font-weight: 600; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; }
+  .sw.red { background: var(--box-red); } .sw.blue { background: var(--box-blue); } .sw.yellow { background: var(--box-yellow); }
+  .warn { color: var(--blocked); }
+  .kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; }
+  .kpi { display: flex; flex-direction: column; gap: 4px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; font: inherit; text-align: left; cursor: pointer; }
+  .kpi:hover { border-color: var(--accent); }
+  .kpi.static { cursor: default; }
+  .kpi.static:hover { border-color: var(--line); }
+  .kpi.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .kpi .l { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .kpi .n { font-size: 22px; font-weight: 650; }
+  .kpi .meter { height: 4px; border-radius: 2px; background: var(--card-2); overflow: hidden; }
+  .kpi .meter i { display: block; height: 100%; background: var(--accent); }
   [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Scenario A</h1>
   <div class="phases">
     <button id="tabSetup" class="on">Setup phase</button>
     <button id="tabUsage" disabled>Usage phase</button>
@@ -126,20 +140,24 @@
 </section>
 
 <main>
+  <section class="kpis" id="kpis"></section>
+
   <!-- left: the map -->
   <section class="card">
     <div class="bar" id="setupBar">
       <div class="seg" id="tools">
-        <button data-tool="box" class="on">▣ Box</button>
+        <button data-tool="red" class="on"><i class="sw red"></i>Red box</button>
+        <button data-tool="blue"><i class="sw blue"></i>Blue box</button>
+        <button data-tool="yellow"><i class="sw yellow"></i>Yellow box</button>
         <button data-tool="robot">● Robot</button>
         <button data-tool="target">⚑ Target</button>
       </div>
-      <span class="hint" id="toolHint">Click a path to add or remove a box.</span>
+      <span class="hint" id="toolHint">Click a path to place a red box. Click it again to remove it.</span>
     </div>
     <div class="bar" id="usageBar" hidden>
       <div class="seg" id="maps">
         <button data-map="decl" class="on">Declaration map</button>
-        <button data-map="lidar">LiDAR map</button>
+        <button data-map="sensor">Sensor map</button>
         <button data-map="total">Total map</button>
       </div>
       <span class="sub" id="mapSub"></span>
@@ -198,10 +216,11 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const ui = {
   state: null,      // last server state
   phase: "setup",   // "setup" | "usage"
-  tool: "box",
+  tool: "red",       // red | blue | yellow | robot | target
   map: "decl",
   draft: null,      // world being edited in setup
   selected: null,   // segment id under inspection
+  filter: null,     // dashboard filter: null | clear | blocked | unknown | red | blue | yellow
   busy: false,
   error: null,
   view: null,       // null = live; otherwise an index into state.timeline (read-only snapshot)
@@ -224,8 +243,13 @@ async function call(path, body) {
 
 function adopt(state) {
   ui.state = state;
-  ui.draft = { robot: state.world.robot, target: state.world.target, boxes: new Set(state.world.boxes) };
+  ui.draft = draftFrom(state.world);
 }
+
+function draftFrom(w) {
+  return { robot: w.robot, target: w.target, boxes: new Map(Object.entries(w.boxes || {})) };
+}
+const BOX_TOOLS = ["red", "blue", "yellow"];
 
 // ---------------------------------------------------------------- geometry
 
@@ -233,7 +257,7 @@ function adopt(state) {
 const C = {};
 function readTheme() {
   const cs = getComputedStyle(document.documentElement);
-  for (const k of ["accent", "clear", "blocked", "unknown", "box", "robot", "target", "ink", "card", "rail", "faint", "bg"]) C[k] = cs.getPropertyValue("--" + k).trim();
+  for (const k of ["accent", "clear", "blocked", "unknown", "box", "robot", "target", "ink", "card", "rail", "faint", "bg", "box-red", "box-blue", "box-yellow", "path-clear", "path-blocked"]) C[k] = cs.getPropertyValue("--" + k).trim();
 }
 const M = 60, S = 120;
 function pos(node) {
@@ -252,7 +276,7 @@ function hoursToAdd() { return Math.max(1, parseInt($("hours").value, 10) || 1);
 // One place that decides what the three maps show.
 //   live view : declaration map = declarative layer NOW (after every write-back), decayed to the
 //               hour the next question will be asked at (clock + time set);
-//               LiDAR / Total = the most recent question.
+//               Sensor / Total = the most recent question.
 //   past view : a timeline snapshot, exactly as it was when that question was answered.
 function view() {
   const st = ui.state;
@@ -272,18 +296,21 @@ function view() {
            declNote: hour === st.clock_h ? `Declaration layer at hour ${hour}` : `Declaration layer decayed to hour ${hour} (when you ask)` };
 }
 
+// Every map cell has the same shape: {state, conf, color, color_conf, ...}.
 function cellsFor(mapName, v) {
   const out = {};
   if (mapName === "decl") {
-    for (const [k, d] of Object.entries(v.decl || {})) out[k] = { blocked: d.blocked, confidence: d.confidence, d };
+    for (const [k, d] of Object.entries(v.decl || {})) out[k] = { state: d.state, conf: d.state_conf, color: d.color, color_conf: d.color_conf, d };
     return out;
   }
   if (!v.rec) return null;
-  if (mapName === "lidar") {
-    for (const [k, r] of Object.entries(v.rec.lidar)) out[k] = { blocked: r.blocked, confidence: r.confidence, r };
+  if (mapName === "sensor") {
+    for (const [k, r] of Object.entries(v.rec.sensor)) out[k] = { state: r.state, conf: r.state_conf, color: r.color, color_conf: r.color_conf, r };
   } else {
-    const written = new Set(v.rec.writes.map((w) => w.segment));
-    for (const [k, t] of Object.entries(v.rec.total)) out[k] = { blocked: t.blocked, confidence: t.confidence, t, written: written.has(k) };
+    const written = new Set(v.rec.writes.map((w) => w.path));
+    for (const [k, t] of Object.entries(v.rec.total)) {
+      out[k] = { state: t.state, conf: t.state_conf, color: t.color, color_conf: t.color_conf, t, written: written.has(k) };
+    }
   }
   return out;
 }
@@ -311,7 +338,60 @@ function render() {
   for (const b of $("maps").children) b.classList.toggle("on", b.dataset.map === ui.map);
 
   renderMap();
+  renderKpis();
   if (usage) { renderTimeline(); renderResult(); renderAsk(); } else renderSetupPanel();
+}
+
+function boxFill(color) { return color ? C["box-" + color] : C.unknown; }
+
+// Dashboard filter: does this cell belong to the highlighted group?
+function passes(c) {
+  if (!ui.filter) return true;
+  if (ui.filter === "clear") return !!c && c.state !== "blocked";
+  if (ui.filter === "blocked") return !!c && c.state === "blocked";
+  if (ui.filter === "unknown") return !c;
+  return !!c && c.state === "blocked" && c.color === ui.filter;
+}
+
+// Dashboard tiles for whatever the map currently shows.
+function renderKpis() {
+  const st = ui.state, usage = ui.phase === "usage";
+  const total = st.layout.segments.length;
+  const cells = usage ? cellsFor(ui.map, view()) : null;
+  const known = usage ? !!cells : false;
+  const ok = !usage || known;
+  let clear = 0, blocked = 0, unknown = 0;
+  const colours = { red: 0, blue: 0, yellow: 0 };
+  if (usage && cells) {
+    for (const s of st.layout.segments) {
+      const c = cells[s.id];
+      if (!c) unknown++;
+      else if (c.state === "blocked") { blocked++; if (c.color in colours) colours[c.color]++; }
+      else clear++;
+    }
+  } else if (!usage) {
+    for (const [, c] of ui.draft.boxes) colours[c]++;
+    blocked = ui.draft.boxes.size;
+    clear = total - blocked;
+  }
+  const show = (n) => (ok ? n : "—");
+  const pct = (n) => (total ? Math.round((100 * n) / total) : 0);
+  const tile = (key, label, n, meter) =>
+    `<button class="kpi${ui.filter === key ? " on" : ""}" data-filter="${key}" title="Highlight these paths on the map">
+       <span class="l">${label}</span><span class="n">${n}</span>
+       ${meter === null ? "" : `<span class="meter"><i style="width:${meter}%"></i></span>`}</button>`;
+  const mapName = { decl: "Declaration", sensor: "Sensor", total: "Total" }[ui.map];
+  const questions = st.timeline.filter((t) => t.kind === "question").length;
+  $("kpis").innerHTML = [
+    `<div class="kpi static"><span class="l">${usage ? `Hour ${st.clock_h}` : "Phase"}</span><span class="n">${usage ? esc(mapName) + " map" : "Setup"}</span></div>`,
+    tile("clear", "Clear paths", show(clear), ok ? pct(clear) : null),
+    tile("blocked", "Blocked paths", show(blocked), ok ? pct(blocked) : null),
+    tile("unknown", "Unknown paths", show(unknown), known ? pct(unknown) : null),
+    tile("red", "Red boxes", show(colours.red), null),
+    tile("blue", "Blue boxes", show(colours.blue), null),
+    tile("yellow", "Yellow boxes", show(colours.yellow), null),
+    `<div class="kpi static"><span class="l">Questions asked</span><span class="n">${questions}</span></div>`,
+  ].join("");
 }
 
 function renderMap() {
@@ -323,16 +403,15 @@ function renderMap() {
 
   if (usage) {
     const v = view(), rec = v.rec;
-    // LiDAR and Total belong to a question: draw the robot where it was for that scan.
-    const fromRec = ui.map !== "decl" && rec;
+    const fromRec = ui.map !== "decl" && rec;   // sensor and total belong to a question
     robot = fromRec ? rec.robot : v.robot;
     target = fromRec ? rec.target : v.target;
     cells = cellsFor(ui.map, v);
-    if (ui.map === "total" && rec && rec.route.found) route = new Set(rec.route.segments);
+    if (ui.map === "total" && rec && rec.route && rec.route.found) route = new Set(rec.route.paths);
     $("mapSub").textContent = ui.map === "decl" ? v.declNote
       : !rec ? (v.past ? "No scan at the setup" : "No scan yet: ask a question")
-      : ui.map === "lidar" ? `Scan from ${rec.robot} at hour ${rec.hour}${v.past ? "" : " (last question)"}`
-      : `Picked by the procedural layer at hour ${rec.hour}${v.past ? "" : " (last question)"}`;
+      : ui.map === "sensor" ? `LiDAR + camera from ${rec.robot} at hour ${rec.hour}${v.past ? "" : " (last question)"}`
+      : `Decided by the procedural layer (LLM) at hour ${rec.hour}${v.past ? "" : " (last question)"}`;
   } else {
     robot = ui.draft.robot; target = ui.draft.target;
   }
@@ -341,20 +420,21 @@ function renderMap() {
   for (const s of segs) {
     if (!route.has(s.id)) continue;
     const [a, b] = [pos(s.a), pos(s.b)];
-    parts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${C.accent}" stroke-opacity=".28" stroke-width="22" stroke-linecap="round"/>`);
+    parts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${C.accent}" stroke-opacity=".3" stroke-width="22" stroke-linecap="round"/>`);
   }
 
-  // segments
+  // path lines: grey = clear, dark = blocked, dashed = unknown / not seen
   for (const s of segs) {
     const [a, b] = [pos(s.a), pos(s.b)];
-    let stroke = C.rail, dash = "", width = 5;
+    let stroke = C["path-clear"], dash = "", width = 5;
     if (usage) {
       const c = cells && cells[s.id];
-      if (!c || c.blocked === null) { stroke = C.unknown; dash = 'stroke-dasharray="6 7"'; width = 3; }
-      else { stroke = c.blocked ? C.blocked : C.clear; width = 6; }
-    }
+      if (!c) { stroke = C.rail; dash = 'stroke-dasharray="6 7"'; width = 3; }
+      else if (c.state === "blocked") { stroke = C["path-blocked"]; width = 6; }
+    } else if (ui.draft.boxes.has(s.id)) { stroke = C["path-blocked"]; width = 6; }
     const sel = ui.selected === s.id;
-    parts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${stroke}" stroke-width="${sel ? width + 3 : width}" ${dash} stroke-linecap="round"/>`);
+    const dim = usage && ui.filter && !passes(cells && cells[s.id]);
+    parts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${stroke}" stroke-width="${sel ? width + 4 : width}" ${dash} ${dim ? 'stroke-opacity=".15"' : ""} stroke-linecap="round"/>`);
   }
 
   // nodes
@@ -364,24 +444,31 @@ function renderMap() {
     parts.push(`<text x="${x - 16}" y="${y - 14}" font-size="11" fill="${C.faint}" text-anchor="middle">${n}</text>`);
   }
 
-  // per-segment marks: boxes in setup, confidence chips in usage
+  // boxes and confidence labels
   for (const s of segs) {
     const [x, y] = mid(s);
     if (!usage) {
-      if (ui.draft.boxes.has(s.id)) {
-        parts.push(`<rect x="${x - 13}" y="${y - 13}" width="26" height="26" rx="4" fill="${C.box}"/>`);
-        parts.push(`<path d="M${x - 13} ${y - 4}h26M${x - 4} ${y - 13}v26" stroke="${C.bg}" stroke-opacity=".35" stroke-width="2"/>`);
-      }
+      const col = ui.draft.boxes.get(s.id);
+      if (col) parts.push(`<rect x="${x - 14}" y="${y - 14}" width="28" height="28" rx="5" fill="${boxFill(col)}" stroke="${C.bg}" stroke-opacity=".5" stroke-width="2"/>`);
       continue;
     }
     const c = cells && cells[s.id];
-    if (!c || c.blocked === null) continue;
-    const txt = c.confidence.toFixed(2);
-    const fill = c.blocked ? C.blocked : C.card;
-    const ink = c.blocked ? "#ffffff" : C.clear;
-    const ring = c.written ? `stroke="${C.ink}" stroke-width="2.5"` : `stroke="${c.blocked ? C.blocked : C.clear}" stroke-width="1.5"`;
-    parts.push(`<rect x="${x - 21}" y="${y - 11}" width="42" height="22" rx="11" fill="${fill}" ${ring}/>`);
-    parts.push(`<text x="${x}" y="${y + 4}" font-size="12" font-weight="600" fill="${ink}" text-anchor="middle">${txt}</text>`);
+    if (!c) continue;
+    parts.push(`<g${usage && ui.filter && !passes(c) ? ' opacity=".18"' : ""}>`);
+    // path confidence chip: beside the box (above a horizontal path, right of a vertical one)
+    const blocked = c.state === "blocked";
+    const [cx, cy] = !blocked ? [x, y] : s.axis === "h" ? [x, y - 30] : [x + 38, y];
+    const ring = c.written ? `stroke="${C.accent}" stroke-width="2.5"` : `stroke="${blocked ? C["path-blocked"] : C["path-clear"]}" stroke-width="1.5"`;
+    parts.push(`<rect x="${cx - 21}" y="${cy - 11}" width="42" height="22" rx="11" fill="${C.card}" ${ring}/>`);
+    parts.push(`<text x="${cx}" y="${cy + 4}" font-size="12" font-weight="600" fill="${C.ink}" text-anchor="middle">${c.conf.toFixed(2)}</text>`);
+    if (blocked) {
+      // the box, in the colour this map believes, with the colour confidence on it
+      const fill = boxFill(c.color);
+      const ink = c.color === "yellow" ? "#1c2024" : "#ffffff";
+      parts.push(`<rect x="${x - 19}" y="${y - 15}" width="38" height="30" rx="5" fill="${fill}" stroke="${C.bg}" stroke-opacity=".5" stroke-width="2"/>`);
+      parts.push(`<text x="${x}" y="${y + 4}" font-size="11" font-weight="700" fill="${ink}" text-anchor="middle">${c.color ? Number(c.color_conf).toFixed(2) : "?"}</text>`);
+    }
+    parts.push("</g>");
   }
 
   // target and robot
@@ -399,9 +486,9 @@ function renderMap() {
   // hit areas (on top)
   for (const s of segs) {
     const [a, b] = [pos(s.a), pos(s.b)];
-    parts.push(`<line class="hit" data-seg="${s.id}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="transparent" stroke-width="26" style="cursor:pointer"/>`);
+    parts.push(`<line class="hit" data-seg="${s.id}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="transparent" stroke-width="30" style="cursor:pointer"/>`);
   }
-  if (!usage && ui.tool !== "box") {
+  if (!usage && !BOX_TOOLS.includes(ui.tool)) {
     for (const n of st.layout.nodes) {
       const [x, y] = pos(n);
       parts.push(`<circle class="hit" data-node="${n}" cx="${x}" cy="${y}" r="20" fill="transparent" style="cursor:pointer"/>`);
@@ -414,17 +501,20 @@ function renderMap() {
 
 function renderLegend() {
   const usage = ui.phase === "usage";
+  const sw = (c) => `<i style="background:${c}"></i>`;
   $("legend").innerHTML = usage
-    ? `<span><i style="background:${C.clear}"></i>clear</span>
-       <span><i style="background:${C.blocked}"></i>blocked</span>
-       <span><i style="background:${C.unknown}"></i>${ui.map === "lidar" ? "not in line of sight" : "unknown"}</span>
-       ${ui.map === "total" ? `<span><i style="background:${C.accent};opacity:.35;height:8px"></i>chosen route</span><span>outlined chip = written to declaration layer</span>` : ""}`
-    : `<span>Robot ● and target ⚑ sit on nodes. A box sits in the middle of a path and blocks it.</span>`;
+    ? `<span>${sw(C["path-clear"])}clear</span><span>${sw(C["path-blocked"])}blocked</span>
+       <span>${sw(C.rail)}${ui.map === "sensor" ? "not in line of sight" : "unknown"}</span>
+       <span><i class="sw red"></i> <i class="sw blue"></i> <i class="sw yellow"></i> box colour · number on the box = colour confidence, chip = path confidence</span>
+       ${ui.map === "total" ? `<span>${sw(C.accent)}route · teal chip = written to declaration layer</span>` : ""}`
+    : `<span>Robot ● and target ⚑ sit on nodes. A box sits in the middle of a path and blocks it; its colour is a label.</span>`;
 }
 
-function fmt(blocked, conf) {
-  if (blocked === null || blocked === undefined) return "unknown";
-  return `${blocked ? "blocked" : "clear"} ${Number(conf).toFixed(2)}`;
+function fmtCell(c) {
+  if (!c) return "unknown";
+  let t = `${c.state} ${Number(c.conf).toFixed(2)}`;
+  if (c.state === "blocked") t += c.color ? `, ${c.color} ${Number(c.color_conf).toFixed(2)}` : ", colour unknown";
+  return t;
 }
 
 function renderInspect() {
@@ -434,16 +524,20 @@ function renderInspect() {
     return;
   }
   const v = view(), rec = v.rec;
-  const d = v.decl && v.decl[id];
-  const r = rec && rec.lidar[id];
-  const t = rec && rec.total[id];
-  const written = rec && rec.writes.some((w) => w.segment === id);
+  const dc = cellsFor("decl", v)[id];
   const bits = [`<b>${id}</b>`];
-  bits.push(`Declared (h${v.declHour}): ${d ? `${fmt(d.blocked, d.confidence)} <span title="stored ${d.stored} at hour ${d.declared_at_hour}, decays ${d.decay_per_hour}/h">(${d.source}, stored ${Number(d.stored).toFixed(2)} at h${d.declared_at_hour}, −${d.decay_per_hour}/h)</span>` : "none"}`);
+  let dtxt = dc ? fmtCell(dc) : "none";
+  if (dc) {
+    const sm = dc.d.state_meta, cm = dc.d.color_meta;
+    dtxt += ` <span title="state stored ${sm.stored} at h${sm.declared_at_hour}${cm ? `; colour stored ${cm.stored} at h${cm.declared_at_hour}` : ""}">(${sm.source}${cm && cm.source !== sm.source ? ` / ${cm.source}` : ""})</span>`;
+  }
+  bits.push(`Declared (h${v.declHour}): ${dtxt}`);
   if (rec) {
-    bits.push(`LiDAR (h${rec.hour}): ${r ? `${fmt(r.blocked, r.confidence)} (${r.distance_cm} cm)` : "not seen"}`);
-    bits.push(`Total: ${t ? `<b>${fmt(t.blocked, t.confidence)}</b>${t.winner ? ` from ${t.winner === "lidar" ? "LiDAR" : "declaration"}` : ""}` : "—"}`);
-    if (written) bits.push(`<b>written to declaration layer</b>`);
+    const sc = cellsFor("sensor", v)[id], tc = cellsFor("total", v)[id];
+    bits.push(`Sensors (h${rec.hour}): ${sc ? `${fmtCell(sc)} (${sc.r.distance_cm} cm ${sc.r.direction})` : "not seen"}`);
+    bits.push(`Total: ${tc ? `<b>${fmtCell(tc)}</b> (state from ${tc.t.state_from}${tc.t.color_from ? `, colour from ${tc.t.color_from}` : ""})` : "<span class='warn'>not decided by the LLM</span>"}`);
+    const w = rec.writes.filter((x) => x.path === id).map((x) => `${x.what} ${x.kind}`);
+    if (w.length) bits.push(`<b>written: ${w.join(", ")}</b>`);
   }
   el.innerHTML = bits.join(" · ");
 }
@@ -454,11 +548,11 @@ function renderSetupPanel() {
   const st = ui.state;
   $("setupTime").textContent = `Hour ${st.clock_h}`;
   $("setupNote").textContent = st.declared
-    ? "Changes here alter the real world only. They are not declared; the next question's LiDAR scan finds them."
+    ? "Changes here alter the real world only. They are not declared; the next question's sensors (LiDAR and camera) find them."
     : "Place the robot, the target and any boxes. Complete setup declares this layout into the declaration layer at hour 0.";
-  const boxes = [...ui.draft.boxes].sort();
+  const boxes = [...ui.draft.boxes].sort((a, b) => a[0].localeCompare(b[0]));
   $("setupFacts").innerHTML = `<span>Robot</span><span>${ui.draft.robot}</span><span>Target</span><span>${ui.draft.target}</span>
-    <span>Boxes</span><span>${boxes.length ? boxes.join(", ") : "none"}</span>`;
+    <span>Boxes</span><span>${boxes.length ? boxes.map(([p, c]) => `<i class="sw ${c}"></i> ${p}`).join(", ") : "none"}</span>`;
 }
 
 function renderResult() {
@@ -469,26 +563,28 @@ function renderResult() {
   if (!v.past && ui.busy) { el.innerHTML = `<p class="empty">The agent is working…</p>`; return; }
   if (!v.past && ui.error) { el.innerHTML = `<p class="answer err">${esc(ui.error)}</p>`; return; }
   if (v.past && v.item.kind === "setup") {
-    const w = v.item.world;
+    const w = v.item.world, bx = Object.entries(w.boxes);
     el.innerHTML = `<div class="q">Hour ${v.item.hour} · Setup</div>
-      <div class="answer">The operator declared the layout: robot at ${w.robot}, target at ${w.target}, boxes on ${w.boxes.length ? w.boxes.join(", ") : "no segments"}.</div>`;
+      <div class="answer">The operator declared the layout: robot at ${w.robot}, target at ${w.target}, ${bx.length ? bx.map(([p, c]) => `a ${c} box on ${p}`).join(", ") : "no boxes"}.</div>`;
     return;
   }
   const rec = v.rec;
   if (!rec) { el.innerHTML = `<p class="empty">Ask a question to run the agent.</p>`; return; }
   const steps = rec.steps.filter((s) => s.tool).map((s) =>
     `<li><code>${esc(s.tool)}</code>${s.ok ? "" : " (failed)"} — ${esc(s.summary)}</li>`).join("");
-  const auto = rec.auto_steps.length ? `<li>auto-run by the backend: <code>${rec.auto_steps.join(", ")}</code></li>` : "";
   const writes = rec.writes.length
-    ? rec.writes.map((w) => `${w.segment} → ${fmt(w.blocked, w.confidence)}${w.kind === "conflict" ? " (conflict)" : w.kind === "new" ? " (new)" : ""}`).join(", ")
-    : "nothing (no LiDAR reading was stronger than its declaration)";
-  const route = rec.route.found ? rec.route.nodes.join(" → ") : "no route";
-  const world = rec.world ? `<br/><b>Real world:</b> robot ${rec.world.robot}, boxes on ${rec.world.boxes.length ? rec.world.boxes.join(", ") : "none"}` : "";
+    ? rec.writes.map((w) => `${w.path} ${w.what}${w.value ? ` → ${w.value} ${Number(w.conf).toFixed(2)}` : " removed"} (${w.kind})`).join(", ")
+    : "nothing (the LLM picked no sensor reading that was news to the declaration layer)";
+  const route = rec.route && rec.route.found ? rec.route.nodes.join(" → ") : "no route";
+  const warn = !rec.submitted ? `<br/><span class="warn"><b>The LLM did not submit a Total map</b>: every path shows as unknown.</span>`
+    : (rec.missing.length || rec.issues.length) ? `<br/><span class="warn"><b>LLM left ${rec.missing.length} path(s) undecided</b>${rec.issues.length ? `; ${rec.issues.length} invalid entr${rec.issues.length === 1 ? "y" : "ies"}` : ""}.</span>` : "";
+  const boxes = rec.world ? Object.entries(rec.world.boxes) : [];
+  const world = rec.world ? `<br/><b>Real world:</b> robot ${rec.world.robot}, boxes ${boxes.length ? boxes.map(([p, c]) => `${c} on ${p}`).join(", ") : "none"}` : "";
   el.innerHTML = `
     <div class="q">Hour ${rec.hour} (+${rec.hours_added}h) · “${esc(rec.question)}”</div>
     <div class="answer">${esc(rec.answer)}</div>
-    <div class="writes"><b>Route:</b> ${route}<br/><b>Written to declaration layer:</b> ${writes}${v.past ? world : ""}</div>
-    <details><summary>Agent steps (${rec.steps.filter((s) => s.tool).length})</summary><ol class="steps">${steps}${auto}</ol></details>`;
+    <div class="writes"><b>Route:</b> ${route}<br/><b>Written to declaration layer:</b> ${writes}${warn}${v.past ? world : ""}</div>
+    <details><summary>Agent steps (${rec.steps.filter((s) => s.tool).length})</summary><ol class="steps">${steps}</ol></details>`;
 }
 
 function renderTimeline() {
@@ -532,7 +628,14 @@ function toast(msg) {
 $("tools").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;
   ui.tool = b.dataset.tool;
-  $("toolHint").textContent = ui.tool === "box" ? "Click a path to add or remove a box." : `Click a node to place the ${ui.tool}.`;
+  $("toolHint").textContent = BOX_TOOLS.includes(ui.tool)
+    ? `Click a path to place a ${ui.tool} box. Click it again to remove it.`
+    : `Click a node to place the ${ui.tool}.`;
+  render();
+});
+$("kpis").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-filter]"); if (!b) return;
+  ui.filter = ui.filter === b.dataset.filter ? null : b.dataset.filter;
   render();
 });
 $("maps").addEventListener("click", (e) => {
@@ -552,8 +655,10 @@ $("map").addEventListener("click", (e) => {
     if (ui.tool === "robot" && n !== d.target) d.robot = n;
     else if (ui.tool === "target" && n !== d.robot) d.target = n;
     else toast("Robot and target need different nodes.");
-  } else if (hit.dataset.seg && ui.tool === "box") {
-    d.boxes.has(hit.dataset.seg) ? d.boxes.delete(hit.dataset.seg) : d.boxes.add(hit.dataset.seg);
+  } else if (hit.dataset.seg && BOX_TOOLS.includes(ui.tool)) {
+    const seg = hit.dataset.seg;
+    if (d.boxes.get(seg) === ui.tool) d.boxes.delete(seg);   // same colour again: remove
+    else d.boxes.set(seg, ui.tool);                          // place, or recolour
   }
   render();
 });
@@ -564,8 +669,7 @@ $("btnChange").addEventListener("click", () => goSetup());
 
 function goSetup() {
   ui.view = null;
-  const w = ui.state.world;
-  ui.draft = { robot: w.robot, target: w.target, boxes: new Set(w.boxes) };
+  ui.draft = draftFrom(ui.state.world);
   ui.phase = "setup"; render();
 }
 
@@ -573,7 +677,7 @@ $("btnComplete").addEventListener("click", async () => {
   const btn = $("btnComplete"); btn.disabled = true;
   try {
     const d = ui.draft;
-    const st = await call("/setup", { robot: d.robot, target: d.target, boxes: [...d.boxes] });
+    const st = await call("/setup", { robot: d.robot, target: d.target, boxes: Object.fromEntries(d.boxes) });
     adopt(st);
     toast(st.declared_now ? "Setup declared into the declaration layer at hour 0." : "Real world updated. Nothing was declared.");
     ui.phase = "usage"; ui.map = "decl"; ui.error = null; ui.view = null;
@@ -625,7 +729,7 @@ $("btnReset").addEventListener("click", async () => {
   resetArmed = false; b.textContent = "Reset"; b.classList.remove("warn");
   try {
     adopt(await call("/reset", {}));
-    Object.assign(ui, { phase: "setup", map: "decl", selected: null, error: null, view: null, preview: null });
+    Object.assign(ui, { phase: "setup", map: "decl", selected: null, filter: null, error: null, view: null, preview: null });
     $("question").value = ""; $("hours").value = 1;
     render(); toast("Back to hour 0.");
   } catch (err) { toast(err.message); }
