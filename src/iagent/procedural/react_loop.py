@@ -30,6 +30,7 @@ Owner: Person 3 (Phase 4). See PROJECT_PLAN.md sections H.2 and H.5.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -106,6 +107,9 @@ def run_react(
     token_budget: int = DEFAULT_TOKEN_BUDGET,
     max_context_messages: int = DEFAULT_CONTEXT_MESSAGES,
     on_step: Any = None,
+    system_prompt: str | None = None,
+    tool_specs: list[dict[str, Any]] | None = None,
+    dispatch_fn: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
 ) -> Trace:
     """Drive one ReAct episode. Returns the completed `Trace`.
 
@@ -121,11 +125,16 @@ def run_react(
         "knowledge": agent.knowledge,
         "sensors": agent.sensors,
     }
-    specs = build_tool_specs(enable_actuators=enable_actuators)
+    specs = tool_specs if tool_specs is not None else build_tool_specs(enable_actuators=enable_actuators)
+
+    def _dispatch(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        if dispatch_fn is not None:
+            return dispatch_fn(name, arguments)
+        return dispatch(name, arguments, apis, enable_actuators=enable_actuators)
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": format_query(query, scenario)},
+        {"role": "system", "content": system_prompt or SYSTEM_PROMPT},
+        {"role": "user", "content": format_query(query, scenario) if system_prompt is None else query},
     ]
     trace = Trace(
         query=query,
@@ -186,7 +195,7 @@ def run_react(
             thought_text = (response.content or "").strip()
             implicit_answer = _parse_implicit_finalize(thought_text)
             if implicit_answer is not None:
-                result = dispatch(FINALIZE_TOOL, implicit_answer, apis, enable_actuators=enable_actuators)
+                result = _dispatch(FINALIZE_TOOL, implicit_answer)
                 _emit(
                     Step(
                         idx=step_idx,
@@ -235,7 +244,7 @@ def run_react(
         finals = [tc for tc in response.tool_calls if tc.name == FINALIZE_TOOL]
 
         for tc in pending:
-            result = dispatch(tc.name, tc.arguments, apis, enable_actuators=enable_actuators)
+            result = _dispatch(tc.name, tc.arguments)
             _emit(
                 _build_step(
                     idx=step_idx,
@@ -253,7 +262,7 @@ def run_react(
             # but each still gets a tool result, or the message log would be
             # invalid on the next request.
             result = (
-                dispatch(tc.name, tc.arguments, apis, enable_actuators=enable_actuators)
+                _dispatch(tc.name, tc.arguments)
                 if position == 0
                 else dict(_DUPLICATE_FINALIZE)
             )
@@ -283,7 +292,7 @@ def run_react(
     # over-verification or self-contradiction.
     if grounded_prose_answer is not None:
         synthetic_args = {"answer": grounded_prose_answer}
-        result = dispatch(FINALIZE_TOOL, synthetic_args, apis, enable_actuators=enable_actuators)
+        result = _dispatch(FINALIZE_TOOL, synthetic_args)
         _emit(
             Step(
                 idx=max_steps,

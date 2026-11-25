@@ -18,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 from iagent.api.epistemic_routes import router as epistemic_router  # noqa: E402
+from iagent.api.grid_routes import page_router as grid_page_router  # noqa: E402
+from iagent.api.grid_routes import router as grid_router  # noqa: E402
 from iagent.api.routes import router  # noqa: E402  (import after env load, intentional)
 from iagent.api.warehouse_routes import router as warehouse_router  # noqa: E402
 
@@ -46,3 +48,5 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(warehouse_router)
 app.include_router(epistemic_router)
+app.include_router(grid_router)
+app.include_router(grid_page_router)

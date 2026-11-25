@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="color-scheme" content="light dark" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>I, Agent · Grid</title>
+<style>
+  :root {
+    --bg: #efece4; --card: #ffffff; --card-2: #f6f4ee; --ink: #1c2024; --muted: #5b636c; --faint: #8b929b;
+    --line: #d6d1c6; --rail: #cfc9bc;
+    --accent: #0d7d74; --accent-ink: #ffffff; --accent-soft: #d9efec;
+    --clear: #2c9b6a; --clear-soft: #e3f3ea; --blocked: #cf4330; --blocked-soft: #f7e2dd;
+    --unknown: #9aa1a9; --box: #1c2024; --robot: #2b6fb3; --target: #7f56d9;
+    --box-red: #d6453d; --box-blue: #2f6fd6; --box-yellow: #e2b007; --path-clear: #a7adb5; --path-blocked: #3c434c;
+    --shadow: 0 1px 2px rgba(28,32,36,.08), 0 8px 24px rgba(28,32,36,.08);
+    --r: 12px;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --bg: #10141a; --card: #181d25; --card-2: #1f2630; --ink: #eef1f5; --muted: #9aa4b1; --faint: #6c7682;
+    --line: #2b333d; --rail: #3a4653;
+    --accent: #2dd4bf; --accent-ink: #06201d; --accent-soft: #12302d;
+    --clear: #36c088; --clear-soft: #13302a; --blocked: #f0634c; --blocked-soft: #3a1f1c;
+    --unknown: #6c7682; --box: #eef1f5; --robot: #5a9ae6; --target: #a78bfa;
+    --box-red: #f0634c; --box-blue: #5a8ff0; --box-yellow: #f2c53d; --path-clear: #5d6773; --path-blocked: #c7ced6;
+    color-scheme: dark;
+  } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  button, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; background: var(--card); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; display: flex; align-items: center; gap: 9px; }
+  header h1::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); }
+  .phases { display: flex; gap: 4px; background: var(--card-2); border: 1px solid var(--line); padding: 4px; border-radius: 10px; }
+  .phases button { border: 0; background: transparent; padding: 6px 14px; border-radius: 7px; color: var(--muted); font-weight: 550; }
+  .phases button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .phases button:disabled { opacity: .45; cursor: not-allowed; }
+  .spacer { flex: 1; }
+  .clock { font-weight: 600; padding: 5px 12px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+  .ghost { border: 1px solid var(--line); background: var(--card); padding: 6px 12px; border-radius: 8px; color: var(--muted); }
+  .ghost.warn { border-color: var(--blocked); color: var(--blocked); }
+
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; padding: 20px 24px; max-width: 1180px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; box-shadow: var(--shadow); }
+
+  .bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { border: 0; background: var(--card); padding: 7px 14px; color: var(--muted); font-weight: 550; display: inline-flex; align-items: center; gap: 6px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--accent-soft); color: var(--accent); }
+  .hint { color: var(--muted); font-size: 13px; }
+  .sub { color: var(--muted); font-size: 13px; margin-left: auto; }
+
+  svg.map { width: 100%; height: auto; display: block; user-select: none; }
+  .inspect { min-height: 22px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  .inspect b { color: var(--ink); font-weight: 600; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 18px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+
+  .panel { display: flex; flex-direction: column; gap: 14px; }
+  .label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 6px; }
+  .big { font-size: 22px; font-weight: 650; }
+  .primary { width: 100%; border: 0; background: var(--accent); color: var(--accent-ink); padding: 10px 14px; border-radius: 9px; font-weight: 600; }
+  .primary:disabled { opacity: .5; cursor: progress; }
+  .secondary:hover, .ghost:hover { border-color: var(--accent); }
+  .secondary { width: 100%; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 9px 14px; border-radius: 9px; font-weight: 550; }
+  .note { font-size: 13px; color: var(--muted); margin: 8px 0 12px; }
+  .facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+  .facts span:nth-child(odd) { color: var(--muted); }
+
+  .result { min-height: 140px; }
+  .q { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .answer { white-space: pre-wrap; }
+  .answer.err { color: var(--blocked); }
+  .empty { color: var(--muted); font-style: italic; }
+  details { margin-top: 10px; font-size: 13px; }
+  details summary { cursor: pointer; color: var(--accent); }
+  .steps { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
+  .steps code { color: var(--ink); font-size: 12px; }
+  .writes { margin-top: 10px; font-size: 13px; padding: 8px 10px; background: var(--card-2); border-radius: 8px; }
+
+  .time { display: flex; align-items: center; gap: 8px; }
+  .time input { background: var(--card); width: 70px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; text-align: center; }
+  .time .plus { font-weight: 700; color: var(--muted); }
+  textarea { background: var(--card); width: 100%; min-height: 76px; resize: vertical; padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
+  textarea:focus, .time input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid color-mix(in srgb, var(--accent-ink) 40%, transparent); border-top-color: var(--accent-ink); border-radius: 50%; animation: s .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 9px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .toast.show { opacity: .95; }
+  .timeline { max-width: 1180px; margin: 16px auto 0; padding: 0 24px; }
+  .tl { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding: 4px 2px 8px; }
+  .tl-item { position: relative; flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    min-width: 120px; max-width: 200px; padding: 8px 12px; margin-right: 22px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--card); color: var(--ink); text-align: left; }
+  .tl-item::after { content: ""; position: absolute; right: -23px; top: 50%; width: 22px; height: 2px; background: var(--line); }
+  .tl-item:last-child::after { display: none; }
+  .tl-item:hover { border-color: var(--accent); }
+  .tl-item.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .tl-item .h { font-size: 12px; font-weight: 700; color: var(--accent); }
+  .tl-item .t { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 176px; }
+  .tl-item.now .h { color: var(--ink); }
+  .pastnote { display: flex; align-items: center; gap: 10px; }
+  .pastnote p { margin: 0; flex: 1; font-size: 13px; color: var(--muted); }
+  .pastnote button { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); padding: 7px 12px; border-radius: 8px; font-weight: 600; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; }
+  .sw.red { background: var(--box-red); } .sw.blue { background: var(--box-blue); } .sw.yellow { background: var(--box-yellow); }
+  .warn { color: var(--blocked); }
+  .kpis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; }
+  .kpi { display: flex; flex-direction: column; gap: 4px; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; font: inherit; text-align: left; cursor: pointer; }
+  .kpi:hover { border-color: var(--accent); }
+  .kpi.static { cursor: default; }
+  .kpi.static:hover { border-color: var(--line); }
+  .kpi.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .kpi .l { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .kpi .n { font-size: 22px; font-weight: 650; }
+  .kpi .meter { height: 4px; border-radius: 2px; background: var(--card-2); overflow: hidden; }
+  .kpi .meter i { display: block; height: 100%; background: var(--accent); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="phases">
+    <button id="tabSetup" class="on">Setup phase</button>
+    <button id="tabUsage" disabled>Usage phase</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="clock" id="clock">Hour 0</span>
+  <button class="ghost" id="btnReset" title="Start again at hour 0">Reset</button>
+</header>
+
+<section class="timeline" id="timelineWrap" hidden>
+  <p class="label">Timeline</p>
+  <div class="tl" id="timeline"></div>
+</section>
+
+<main>
+  <section class="kpis" id="kpis"></section>
+
+  <!-- left: the map -->
+  <section class="card">
+    <div class="bar" id="setupBar">
+      <div class="seg" id="tools">
+        <button data-tool="red" class="on"><i class="sw red"></i>Red box</button>
+        <button data-tool="blue"><i class="sw blue"></i>Blue box</button>
+        <button data-tool="yellow"><i class="sw yellow"></i>Yellow box</button>
+        <button data-tool="robot">● Robot</button>
+        <button data-tool="target">⚑ Target</button>
+      </div>
+      <span class="hint" id="toolHint">Click a path to place a red box. Click it again to remove it.</span>
+    </div>
+    <div class="bar" id="usageBar" hidden>
+      <div class="seg" id="maps">
+        <button data-map="decl" class="on">Declaration map</button>
+        <button data-map="sensor">Sensor map</button>
+        <button data-map="total">Total map</button>
+      </div>
+      <span class="sub" id="mapSub"></span>
+    </div>
+    <svg class="map" id="map" viewBox="0 0 600 470" aria-label="Warehouse grid"></svg>
+    <div class="inspect" id="inspect"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <!-- right: controls -->
+  <aside class="panel">
+    <!-- setup -->
+    <div class="card" id="setupPanel">
+      <p class="label">Current time</p>
+      <div class="big" id="setupTime">Hour 0</div>
+      <p class="note" id="setupNote"></p>
+      <div class="facts" id="setupFacts"></div>
+      <div style="height:14px"></div>
+      <button class="primary" id="btnComplete">Complete setup</button>
+    </div>
+
+    <!-- usage -->
+    <div class="card pastnote" id="pastCard" hidden>
+      <p id="pastText"></p>
+      <button id="btnNow">Back to now</button>
+    </div>
+    <div class="card result" id="resultCard" hidden>
+      <p class="label">Result</p>
+      <div id="result"><p class="empty">Ask a question to run the agent.</p></div>
+    </div>
+    <button class="secondary" id="btnChange" hidden>Change setup</button>
+    <div class="card" id="askCard" hidden>
+      <p class="label">Time set</p>
+      <div class="time">
+        <span class="plus">+</span>
+        <input id="hours" type="number" min="1" step="1" value="1" aria-label="Hours to add" />
+        <span>hours</span>
+        <span class="sub" id="askAt"></span>
+      </div>
+      <div style="height:14px"></div>
+      <p class="label">Ask AI</p>
+      <textarea id="question" placeholder="e.g. Can the robot reach the target? Which path should it take?"></textarea>
+      <div style="height:10px"></div>
+      <button class="primary" id="btnSend">Send</button>
+    </div>
+  </aside>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const API = "/api/grid";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const ui = {
+  state: null,      // last server state
+  phase: "setup",   // "setup" | "usage"
+  tool: "red",       // red | blue | yellow | robot | target
+  map: "decl",
+  draft: null,      // world being edited in setup
+  selected: null,   // segment id under inspection
+  filter: null,     // dashboard filter: null | clear | blocked | unknown | red | blue | yellow
+  busy: false,
+  error: null,
+  view: null,       // null = live; otherwise an index into state.timeline (read-only snapshot)
+  preview: null,    // {hour, declarations}: declarative layer decayed to the hour the next question will be asked at
+};
+
+// ---------------------------------------------------------------- server
+
+async function call(path, body) {
+  const res = await fetch(API + path, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  let data = null;
+  try { data = await res.json(); } catch { /* empty */ }
+  if (!res.ok) throw new Error((data && data.detail) ? (typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail)) : `HTTP ${res.status}`);
+  return data;
+}
+
+function adopt(state) {
+  ui.state = state;
+  ui.draft = draftFrom(state.world);
+}
+
+function draftFrom(w) {
+  return { robot: w.robot, target: w.target, boxes: new Map(Object.entries(w.boxes || {})) };
+}
+const BOX_TOOLS = ["red", "blue", "yellow"];
+
+// ---------------------------------------------------------------- geometry
+
+// SVG presentation attributes can't use var() in every browser, so resolve the theme once per render.
+const C = {};
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ["accent", "clear", "blocked", "unknown", "box", "robot", "target", "ink", "card", "rail", "faint", "bg", "box-red", "box-blue", "box-yellow", "path-clear", "path-blocked"]) C[k] = cs.getPropertyValue("--" + k).trim();
+}
+const M = 60, S = 120;
+function pos(node) {
+  const c = "ABCDE".indexOf(node[0]), r = Number(node[1]) - 1;
+  return [M + c * S, M + r * S];
+}
+function mid(seg) {
+  const [a, b] = [pos(seg.a), pos(seg.b)];
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+}
+
+// ---------------------------------------------------------------- what each map shows
+
+function hoursToAdd() { return Math.max(1, parseInt($("hours").value, 10) || 1); }
+
+// One place that decides what the three maps show.
+//   live view : declaration map = declarative layer NOW (after every write-back), decayed to the
+//               hour the next question will be asked at (clock + time set);
+//               Sensor / Total = the most recent question.
+//   past view : a timeline snapshot, exactly as it was when that question was answered.
+function view() {
+  const st = ui.state;
+  if (ui.view !== null && st.timeline[ui.view]) {
+    const it = st.timeline[ui.view];
+    if (it.kind === "setup") {
+      return { past: true, item: it, decl: it.declarations, declHour: it.hour, rec: null, robot: it.robot, target: it.target,
+               declNote: `Operator's setup declaration at hour ${it.hour}` };
+    }
+    return { past: true, item: it, decl: it.declarations, declHour: it.hour, rec: it, robot: it.robot, target: it.target,
+             declNote: `Declared just before the scan, decayed to hour ${it.hour}` };
+  }
+  const pv = ui.preview;
+  const hour = pv ? pv.hour : st.clock_h;
+  return { past: false, item: null, decl: pv ? pv.declarations : st.declarations, declHour: hour, rec: st.last,
+           robot: st.world.robot, target: st.world.target,
+           declNote: hour === st.clock_h ? `Declaration layer at hour ${hour}` : `Declaration layer decayed to hour ${hour} (when you ask)` };
+}
+
+// Every map cell has the same shape: {state, conf, color, color_conf, ...}.
+function cellsFor(mapName, v) {
+  const out = {};
+  if (mapName === "decl") {
+    for (const [k, d] of Object.entries(v.decl || {})) out[k] = { state: d.state, conf: d.state_conf, color: d.color, color_conf: d.color_conf, d };
+    return out;
+  }
+  if (!v.rec) return null;
+  if (mapName === "sensor") {
+    for (const [k, r] of Object.entries(v.rec.sensor)) out[k] = { state: r.state, conf: r.state_conf, color: r.color, color_conf: r.color_conf, r };
+  } else {
+    const written = new Set(v.rec.writes.map((w) => w.path));
+    for (const [k, t] of Object.entries(v.rec.total)) {
+      out[k] = { state: t.state, conf: t.state_conf, color: t.color, color_conf: t.color_conf, t, written: written.has(k) };
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- render: map
+
+function render() {
+  const st = ui.state;
+  if (!st) return;
+  const usage = ui.phase === "usage";
+  $("tabSetup").classList.toggle("on", !usage);
+  $("tabUsage").classList.toggle("on", usage);
+  $("tabUsage").disabled = !st.declared;
+  $("clock").textContent = `Hour ${st.clock_h}`;
+  $("setupBar").hidden = usage;
+  $("usageBar").hidden = !usage;
+  $("setupPanel").hidden = usage;
+  const past = usage && ui.view !== null;
+  $("timelineWrap").hidden = !usage || !st.timeline.length;
+  $("resultCard").hidden = !usage;
+  $("pastCard").hidden = !past;
+  $("btnChange").hidden = !usage || past;
+  $("askCard").hidden = !usage || past;
+  for (const b of $("tools").children) b.classList.toggle("on", b.dataset.tool === ui.tool);
+  for (const b of $("maps").children) b.classList.toggle("on", b.dataset.map === ui.map);
+
+  renderMap();
+  renderKpis();
+  if (usage) { renderTimeline(); renderResult(); renderAsk(); } else renderSetupPanel();
+}
+
+function boxFill(color) { return color ? C["box-" + color] : C.unknown; }
+
+// Dashboard filter: does this cell belong to the highlighted group?
+function passes(c) {
+  if (!ui.filter) return true;
+  if (ui.filter === "clear") return !!c && c.state !== "blocked";
+  if (ui.filter === "blocked") return !!c && c.state === "blocked";
+  if (ui.filter === "unknown") return !c;
+  return !!c && c.state === "blocked" && c.color === ui.filter;
+}
+
+// Dashboard tiles for whatever the map currently shows.
+function renderKpis() {
+  const st = ui.state, usage = ui.phase === "usage";
+  const total = st.layout.segments.length;
+  const cells = usage ? cellsFor(ui.map, view()) : null;
+  const known = usage ? !!cells : false;
+  const ok = !usage || known;
+  let clear = 0, blocked = 0, unknown = 0;
+  const colours = { red: 0, blue: 0, yellow: 0 };
+  if (usage && cells) {
+    for (const s of st.layout.segments) {
+      const c = cells[s.id];
+      if (!c) unknown++;
+      else if (c.state === "blocked") { blocked++; if (c.color in colours) colours[c.color]++; }
+      else clear++;
+    }
+  } else if (!usage) {
+    for (const [, c] of ui.draft.boxes) colours[c]++;
+    blocked = ui.draft.boxes.size;
+    clear = total - blocked;
+  }
+  const show = (n) => (ok ? n : "—");
+  const pct = (n) => (total ? Math.round((100 * n) / total) : 0);
+  const tile = (key, label, n, meter) =>
+    `<button class="kpi${ui.filter === key ? " on" : ""}" data-filter="${key}" title="Highlight these paths on the map">
+       <span class="l">${label}</span><span class="n">${n}</span>
+       ${meter === null ? "" : `<span class="meter"><i style="width:${meter}%"></i></span>`}</button>`;
+  const mapName = { decl: "Declaration", sensor: "Sensor", total: "Total" }[ui.map];
+  const questions = st.timeline.filter((t) => t.kind === "question").length;
+  $("kpis").innerHTML = [
+    `<div class="kpi static"><span class="l">${usage ? `Hour ${st.clock_h}` : "Phase"}</span><span class="n">${usage ? esc(mapName) + " map" : "Setup"}</span></div>`,
+    tile("clear", "Clear paths", show(clear), ok ? pct(clear) : null),
+    tile("blocked", "Blocked paths", show(blocked), ok ? pct(blocked) : null),
+    tile("unknown", "Unknown paths", show(unknown), known ? pct(unknown) : null),
+    tile("red", "Red boxes", show(colours.red), null),
+    tile("blue", "Blue boxes", show(colours.blue), null),
+    tile("yellow", "Yellow boxes", show(colours.yellow), null),
+    `<div class="kpi static"><span class="l">Questions asked</span><span class="n">${questions}</span></div>`,
+  ].join("");
+}
+
+function renderMap() {
+  readTheme();
+  const st = ui.state, usage = ui.phase === "usage", svg = $("map");
+  const segs = st.layout.segments;
+  const parts = [];
+  let robot, target, cells = null, route = new Set();
+
+  if (usage) {
+    const v = view(), rec = v.rec;
+    const fromRec = ui.map !== "decl" && rec;   // sensor and total belong to a question
+    robot = fromRec ? rec.robot : v.robot;
+    target = fromRec ? rec.target : v.target;
+    cells = cellsFor(ui.map, v);
+    if (ui.map === "total" && rec && rec.route && rec.route.found) route = new Set(rec.route.paths);
+    $("mapSub").textContent = ui.map === "decl" ? v.declNote
+      : !rec ? (v.past ? "No scan at the setup" : "No scan yet: ask a question")
+      : ui.map === "sensor" ? `LiDAR + camera from ${rec.robot} at hour ${rec.hour}${v.past ? "" : " (last question)"}`
+      : `Decided by the procedural layer (LLM) at hour ${rec.hour}${v.past ? "" : " (last question)"}`;
+  } else {
+    robot = ui.draft.robot; target = ui.draft.target;
+  }
+
+  // route underlay
+  for (const s of segs) {
+    if (!route.has(s.id)) continue;
+    const [a, b] = [pos(s.a), pos(s.b)];
+    parts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${C.accent}" stroke-opacity=".3" stroke-width="22" stroke-linecap="round"/>`);
+  }
+
+  // path lines: grey = clear, dark = blocked, dashed = unknown / not seen
+  for (const s of segs) {
+    const [a, b] = [pos(s.a), pos(s.b)];
+    let stroke = C["path-clear"], dash = "", width = 5;
+    if (usage) {
+      const c = cells && cells[s.id];
+      if (!c) { stroke = C.rail; dash = 'stroke-dasharray="6 7"'; width = 3; }
+      else if (c.state === "blocked") { stroke = C["path-blocked"]; width = 6; }
+    } else if (ui.draft.boxes.has(s.id)) { stroke = C["path-blocked"]; width = 6; }
+    const sel = ui.selected === s.id;
+    const dim = usage && ui.filter && !passes(cells && cells[s.id]);
+    parts.push(`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${stroke}" stroke-width="${sel ? width + 4 : width}" ${dash} ${dim ? 'stroke-opacity=".15"' : ""} stroke-linecap="round"/>`);
+  }
+
+  // nodes
+  for (const n of st.layout.nodes) {
+    const [x, y] = pos(n);
+    parts.push(`<circle cx="${x}" cy="${y}" r="7" fill="${C.card}" stroke="${C.faint}" stroke-width="2"/>`);
+    parts.push(`<text x="${x - 16}" y="${y - 14}" font-size="11" fill="${C.faint}" text-anchor="middle">${n}</text>`);
+  }
+
+  // boxes and confidence labels
+  for (const s of segs) {
+    const [x, y] = mid(s);
+    if (!usage) {
+      const col = ui.draft.boxes.get(s.id);
+      if (col) parts.push(`<rect x="${x - 14}" y="${y - 14}" width="28" height="28" rx="5" fill="${boxFill(col)}" stroke="${C.bg}" stroke-opacity=".5" stroke-width="2"/>`);
+      continue;
+    }
+    const c = cells && cells[s.id];
+    if (!c) continue;
+    parts.push(`<g${usage && ui.filter && !passes(c) ? ' opacity=".18"' : ""}>`);
+    // path confidence chip: beside the box (above a horizontal path, right of a vertical one)
+    const blocked = c.state === "blocked";
+    const [cx, cy] = !blocked ? [x, y] : s.axis === "h" ? [x, y - 30] : [x + 38, y];
+    const ring = c.written ? `stroke="${C.accent}" stroke-width="2.5"` : `stroke="${blocked ? C["path-blocked"] : C["path-clear"]}" stroke-width="1.5"`;
+    parts.push(`<rect x="${cx - 21}" y="${cy - 11}" width="42" height="22" rx="11" fill="${C.card}" ${ring}/>`);
+    parts.push(`<text x="${cx}" y="${cy + 4}" font-size="12" font-weight="600" fill="${C.ink}" text-anchor="middle">${c.conf.toFixed(2)}</text>`);
+    if (blocked) {
+      // the box, in the colour this map believes, with the colour confidence on it
+      const fill = boxFill(c.color);
+      const ink = c.color === "yellow" ? "#1c2024" : "#ffffff";
+      parts.push(`<rect x="${x - 19}" y="${y - 15}" width="38" height="30" rx="5" fill="${fill}" stroke="${C.bg}" stroke-opacity=".5" stroke-width="2"/>`);
+      parts.push(`<text x="${x}" y="${y + 4}" font-size="11" font-weight="700" fill="${ink}" text-anchor="middle">${c.color ? Number(c.color_conf).toFixed(2) : "?"}</text>`);
+    }
+    parts.push("</g>");
+  }
+
+  // target and robot
+  {
+    const [x, y] = pos(target);
+    parts.push(`<circle cx="${x}" cy="${y}" r="17" fill="none" stroke="${C.target}" stroke-width="3"/>`);
+    parts.push(`<path d="M${x - 5} ${y + 8}V${y - 9}l11 4-11 4" fill="${C.target}" stroke="${C.target}" stroke-width="2" stroke-linejoin="round"/>`);
+  }
+  {
+    const [x, y] = pos(robot);
+    parts.push(`<circle cx="${x}" cy="${y}" r="15" fill="${C.robot}"/>`);
+    parts.push(`<text x="${x}" y="${y + 5}" font-size="13" font-weight="700" fill="#fff" text-anchor="middle">R</text>`);
+  }
+
+  // hit areas (on top)
+  for (const s of segs) {
+    const [a, b] = [pos(s.a), pos(s.b)];
+    parts.push(`<line class="hit" data-seg="${s.id}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="transparent" stroke-width="30" style="cursor:pointer"/>`);
+  }
+  if (!usage && !BOX_TOOLS.includes(ui.tool)) {
+    for (const n of st.layout.nodes) {
+      const [x, y] = pos(n);
+      parts.push(`<circle class="hit" data-node="${n}" cx="${x}" cy="${y}" r="20" fill="transparent" style="cursor:pointer"/>`);
+    }
+  }
+  svg.innerHTML = parts.join("");
+  renderInspect();
+  renderLegend();
+}
+
+function renderLegend() {
+  const usage = ui.phase === "usage";
+  const sw = (c) => `<i style="background:${c}"></i>`;
+  $("legend").innerHTML = usage
+    ? `<span>${sw(C["path-clear"])}clear</span><span>${sw(C["path-blocked"])}blocked</span>
+       <span>${sw(C.rail)}${ui.map === "sensor" ? "not in line of sight" : "unknown"}</span>
+       <span><i class="sw red"></i> <i class="sw blue"></i> <i class="sw yellow"></i> box colour · number on the box = colour confidence, chip = path confidence</span>
+       ${ui.map === "total" ? `<span>${sw(C.accent)}route · teal chip = written to declaration layer</span>` : ""}`
+    : `<span>Robot ● and target ⚑ sit on nodes. A box sits in the middle of a path and blocks it; its colour is a label.</span>`;
+}
+
+function fmtCell(c) {
+  if (!c) return "unknown";
+  let t = `${c.state} ${Number(c.conf).toFixed(2)}`;
+  if (c.state === "blocked") t += c.color ? `, ${c.color} ${Number(c.color_conf).toFixed(2)}` : ", colour unknown";
+  return t;
+}
+
+function renderInspect() {
+  const el = $("inspect"), id = ui.selected;
+  if (ui.phase !== "usage" || !id) {
+    el.innerHTML = ui.phase === "usage" ? "Click a path to compare the three maps for it." : "";
+    return;
+  }
+  const v = view(), rec = v.rec;
+  const dc = cellsFor("decl", v)[id];
+  const bits = [`<b>${id}</b>`];
+  let dtxt = dc ? fmtCell(dc) : "none";
+  if (dc) {
+    const sm = dc.d.state_meta, cm = dc.d.color_meta;
+    dtxt += ` <span title="state stored ${sm.stored} at h${sm.declared_at_hour}${cm ? `; colour stored ${cm.stored} at h${cm.declared_at_hour}` : ""}">(${sm.source}${cm && cm.source !== sm.source ? ` / ${cm.source}` : ""})</span>`;
+  }
+  bits.push(`Declared (h${v.declHour}): ${dtxt}`);
+  if (rec) {
+    const sc = cellsFor("sensor", v)[id], tc = cellsFor("total", v)[id];
+    bits.push(`Sensors (h${rec.hour}): ${sc ? `${fmtCell(sc)} (${sc.r.distance_cm} cm ${sc.r.direction})` : "not seen"}`);
+    bits.push(`Total: ${tc ? `<b>${fmtCell(tc)}</b> (state from ${tc.t.state_from}${tc.t.color_from ? `, colour from ${tc.t.color_from}` : ""})` : "<span class='warn'>not decided by the LLM</span>"}`);
+    const w = rec.writes.filter((x) => x.path === id).map((x) => `${x.what} ${x.kind}`);
+    if (w.length) bits.push(`<b>written: ${w.join(", ")}</b>`);
+  }
+  el.innerHTML = bits.join(" · ");
+}
+
+// ---------------------------------------------------------------- render: panels
+
+function renderSetupPanel() {
+  const st = ui.state;
+  $("setupTime").textContent = `Hour ${st.clock_h}`;
+  $("setupNote").textContent = st.declared
+    ? "Changes here alter the real world only. They are not declared; the next question's sensors (LiDAR and camera) find them."
+    : "Place the robot, the target and any boxes. Complete setup declares this layout into the declaration layer at hour 0.";
+  const boxes = [...ui.draft.boxes].sort((a, b) => a[0].localeCompare(b[0]));
+  $("setupFacts").innerHTML = `<span>Robot</span><span>${ui.draft.robot}</span><span>Target</span><span>${ui.draft.target}</span>
+    <span>Boxes</span><span>${boxes.length ? boxes.map(([p, c]) => `<i class="sw ${c}"></i> ${p}`).join(", ") : "none"}</span>`;
+}
+
+function renderResult() {
+  const el = $("result"), v = view();
+  if (v.past) {
+    $("pastText").innerHTML = `Viewing <b>hour ${v.item.hour}</b>, read-only. The clock is at hour ${ui.state.clock_h}.`;
+  }
+  if (!v.past && ui.busy) { el.innerHTML = `<p class="empty">The agent is working…</p>`; return; }
+  if (!v.past && ui.error) { el.innerHTML = `<p class="answer err">${esc(ui.error)}</p>`; return; }
+  if (v.past && v.item.kind === "setup") {
+    const w = v.item.world, bx = Object.entries(w.boxes);
+    el.innerHTML = `<div class="q">Hour ${v.item.hour} · Setup</div>
+      <div class="answer">The operator declared the layout: robot at ${w.robot}, target at ${w.target}, ${bx.length ? bx.map(([p, c]) => `a ${c} box on ${p}`).join(", ") : "no boxes"}.</div>`;
+    return;
+  }
+  const rec = v.rec;
+  if (!rec) { el.innerHTML = `<p class="empty">Ask a question to run the agent.</p>`; return; }
+  const steps = rec.steps.filter((s) => s.tool).map((s) =>
+    `<li><code>${esc(s.tool)}</code>${s.ok ? "" : " (failed)"} — ${esc(s.summary)}</li>`).join("");
+  const writes = rec.writes.length
+    ? rec.writes.map((w) => `${w.path} ${w.what}${w.value ? ` → ${w.value} ${Number(w.conf).toFixed(2)}` : " removed"} (${w.kind})`).join(", ")
+    : "nothing (the LLM picked no sensor reading that was news to the declaration layer)";
+  const route = rec.route && rec.route.found ? rec.route.nodes.join(" → ") : "no route";
+  const warn = !rec.submitted ? `<br/><span class="warn"><b>The LLM did not submit a Total map</b>: every path shows as unknown.</span>`
+    : (rec.missing.length || rec.issues.length) ? `<br/><span class="warn"><b>LLM left ${rec.missing.length} path(s) undecided</b>${rec.issues.length ? `; ${rec.issues.length} invalid entr${rec.issues.length === 1 ? "y" : "ies"}` : ""}.</span>` : "";
+  const boxes = rec.world ? Object.entries(rec.world.boxes) : [];
+  const world = rec.world ? `<br/><b>Real world:</b> robot ${rec.world.robot}, boxes ${boxes.length ? boxes.map(([p, c]) => `${c} on ${p}`).join(", ") : "none"}` : "";
+  el.innerHTML = `
+    <div class="q">Hour ${rec.hour} (+${rec.hours_added}h) · “${esc(rec.question)}”</div>
+    <div class="answer">${esc(rec.answer)}</div>
+    <div class="writes"><b>Route:</b> ${route}<br/><b>Written to declaration layer:</b> ${writes}${warn}${v.past ? world : ""}</div>
+    <details><summary>Agent steps (${rec.steps.filter((s) => s.tool).length})</summary><ol class="steps">${steps}</ol></details>`;
+}
+
+function renderTimeline() {
+  const st = ui.state;
+  const items = st.timeline.map((it, i) => {
+    const on = ui.view === i ? " on" : "";
+    const text = it.kind === "setup" ? "Setup declared" : `“${esc(it.question)}”`;
+    return `<button class="tl-item${on}" data-idx="${i}" title="${it.kind === "setup" ? "Setup" : esc(it.question)}">
+      <span class="h">Hour ${it.hour}${it.kind === "question" ? ` · Q${i}` : ""}</span><span class="t">${text}</span></button>`;
+  });
+  const nowOn = ui.view === null ? " on" : "";
+  items.push(`<button class="tl-item now${nowOn}" data-idx="now"><span class="h">Now · hour ${st.clock_h}</span><span class="t">Live: ask the next question</span></button>`);
+  $("timeline").innerHTML = items.join("");
+}
+
+async function refreshPreview() {
+  const st = ui.state;
+  if (!st || !st.declared) { ui.preview = null; return; }
+  const hour = st.clock_h + hoursToAdd();
+  try {
+    ui.preview = await call(`/declarations?hour=${hour}`);
+  } catch { ui.preview = null; }
+  if (ui.phase === "usage" && ui.view === null) render();
+}
+
+function renderAsk() {
+  $("askAt").textContent = `asked at hour ${ui.state.clock_h + hoursToAdd()}`;
+  const btn = $("btnSend");
+  btn.disabled = ui.busy;
+  btn.innerHTML = ui.busy ? `<span class="spin"></span>Thinking…` : "Send";
+}
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+// ---------------------------------------------------------------- events
+
+$("tools").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  ui.tool = b.dataset.tool;
+  $("toolHint").textContent = BOX_TOOLS.includes(ui.tool)
+    ? `Click a path to place a ${ui.tool} box. Click it again to remove it.`
+    : `Click a node to place the ${ui.tool}.`;
+  render();
+});
+$("kpis").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-filter]"); if (!b) return;
+  ui.filter = ui.filter === b.dataset.filter ? null : b.dataset.filter;
+  render();
+});
+$("maps").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  ui.map = b.dataset.map; render();
+});
+
+$("map").addEventListener("click", (e) => {
+  const hit = e.target.closest(".hit"); if (!hit) return;
+  if (ui.phase === "usage") {
+    if (hit.dataset.seg) { ui.selected = ui.selected === hit.dataset.seg ? null : hit.dataset.seg; renderMap(); }
+    return;
+  }
+  const d = ui.draft;
+  if (hit.dataset.node) {
+    const n = hit.dataset.node;
+    if (ui.tool === "robot" && n !== d.target) d.robot = n;
+    else if (ui.tool === "target" && n !== d.robot) d.target = n;
+    else toast("Robot and target need different nodes.");
+  } else if (hit.dataset.seg && BOX_TOOLS.includes(ui.tool)) {
+    const seg = hit.dataset.seg;
+    if (d.boxes.get(seg) === ui.tool) d.boxes.delete(seg);   // same colour again: remove
+    else d.boxes.set(seg, ui.tool);                          // place, or recolour
+  }
+  render();
+});
+
+$("tabSetup").addEventListener("click", () => goSetup());
+$("tabUsage").addEventListener("click", () => { if (ui.state.declared) { ui.phase = "usage"; render(); } });
+$("btnChange").addEventListener("click", () => goSetup());
+
+function goSetup() {
+  ui.view = null;
+  ui.draft = draftFrom(ui.state.world);
+  ui.phase = "setup"; render();
+}
+
+$("btnComplete").addEventListener("click", async () => {
+  const btn = $("btnComplete"); btn.disabled = true;
+  try {
+    const d = ui.draft;
+    const st = await call("/setup", { robot: d.robot, target: d.target, boxes: Object.fromEntries(d.boxes) });
+    adopt(st);
+    toast(st.declared_now ? "Setup declared into the declaration layer at hour 0." : "Real world updated. Nothing was declared.");
+    ui.phase = "usage"; ui.map = "decl"; ui.error = null; ui.view = null;
+    render(); refreshPreview();
+  } catch (err) { toast(err.message); }
+  finally { btn.disabled = false; }
+});
+
+$("hours").addEventListener("input", () => { renderAsk(); clearTimeout(refreshPreview.t); refreshPreview.t = setTimeout(refreshPreview, 150); });
+$("timeline").addEventListener("click", (e) => {
+  const b = e.target.closest(".tl-item"); if (!b) return;
+  ui.view = b.dataset.idx === "now" ? null : Number(b.dataset.idx);
+  const it = ui.view === null ? null : ui.state.timeline[ui.view];
+  if (it && it.kind === "setup") ui.map = "decl";
+  render();
+});
+$("btnNow").addEventListener("click", () => { ui.view = null; render(); });
+$("question").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("btnSend").click();
+});
+
+$("btnSend").addEventListener("click", async () => {
+  const question = $("question").value.trim();
+  if (!question) { $("question").focus(); return; }
+  const hours = Math.max(1, parseInt($("hours").value, 10) || 1);
+  ui.busy = true; ui.error = null; render();
+  try {
+    const st = await call("/ask", { question, hours });
+    adopt(st);
+    ui.map = "total"; ui.view = null;
+    $("hours").value = 1;
+    $("question").value = "";
+  } catch (err) {
+    ui.error = err.message;
+  } finally {
+    ui.busy = false; render();
+    refreshPreview();
+  }
+});
+
+let resetArmed = false;
+$("btnReset").addEventListener("click", async () => {
+  const b = $("btnReset");
+  if (!resetArmed) {
+    resetArmed = true; b.textContent = "Click again to reset"; b.classList.add("warn");
+    setTimeout(() => { resetArmed = false; b.textContent = "Reset"; b.classList.remove("warn"); }, 3000);
+    return;
+  }
+  resetArmed = false; b.textContent = "Reset"; b.classList.remove("warn");
+  try {
+    adopt(await call("/reset", {}));
+    Object.assign(ui, { phase: "setup", map: "decl", selected: null, filter: null, error: null, view: null, preview: null });
+    $("question").value = ""; $("hours").value = 1;
+    render(); toast("Back to hour 0.");
+  } catch (err) { toast(err.message); }
+});
+
+// ---------------------------------------------------------------- boot
+
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render());
+
+(async () => {
+  try {
+    adopt(await call("/state"));
+    ui.phase = ui.state.declared ? "usage" : "setup";
+    if (ui.state.last) ui.map = "total";
+    render(); refreshPreview();
+  } catch (err) {
+    document.querySelector("main").innerHTML =
+      `<div class="card" style="grid-column:1/-1"><b>Can't reach the backend.</b><p class="note">Start it with <code>uvicorn iagent.api.server:app --port 8000</code> and reload. (${esc(err.message)})</p></div>`;
+  }
+})();
+</script>
+</body>
+</html>

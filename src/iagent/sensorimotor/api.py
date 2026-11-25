@@ -58,6 +58,14 @@ class SensorimotorAPI:
             presets=self._env.sensor_presets,
         )
 
+    def sense_lidar_sweep(self) -> SensorPayload:
+        """LiDAR over the robot's whole row and column (all four directions)."""
+        return sensors.read_lidar_sweep(self._env.world_state, observed_at=self._env.now)
+
+    def sense_camera_sweep(self) -> SensorPayload:
+        """Camera over all four directions: colour of the first obstacle in each."""
+        return sensors.read_camera_sweep(self._env.world_state, observed_at=self._env.now)
+
     def sense_clock(self) -> SensorPayload:
         return sensors.read_clock(observed_at=self._env.now)
 
