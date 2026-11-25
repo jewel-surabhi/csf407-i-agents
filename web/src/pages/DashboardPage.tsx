@@ -104,6 +104,13 @@ export default function DashboardPage() {
             title="Ghost Timeline"
             desc="Drag-and-drop belief simulator: build a scenario, run it hour by hour, watch confidence decay and routes replan."
           />
+          <NavCard
+            to="/grid.html"
+            external
+            eyebrow="Scenario A · Grid"
+            title="Grid Dashboard"
+            desc="Real Groq ReAct loop over a declaration + sensor grid: layer readers, coloured-box sensor map, and an LLM-built total map."
+          />
         </section>
       </div>
     </main>
